@@ -16,7 +16,7 @@ on:
         type: string
         description: "Empacotador"
         required: true
-        default: 'Vilmar Catafesta <vcatafesta@gmail.com>
+        default: "Vilmar Catafesta <vcatafesta@gmail.com>"
 
   #  schedule:  # Executa automaticamente toda sexta-feira às 05:00
   #    - cron: '0 5 * * 5'
@@ -29,7 +29,6 @@ on:
 env:
   PKGMAKE_PRIVATE_KEY: "${{ secrets.PKGMAKE_PRIVATE_KEY }}"
   PKGMAKE_PACKAGER: "${{ github.event.client_payload.packager || inputs.packager || 'Vilmar Catafesta <vvcatafesta@gmail.com' }}"
-
 
 jobs:
   build:
@@ -77,4 +76,4 @@ jobs:
         shell: bash
         run: |
           cd gitrepo/pkgfile
-          pkgmake -s --packager "${PKGMAKE_PACKAGER}"
+          pkgmake -s --packager "$PKGMAKE_PACKAGER"
