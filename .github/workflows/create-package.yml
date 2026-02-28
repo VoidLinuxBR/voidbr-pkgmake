@@ -72,20 +72,25 @@ jobs:
       - name: Create private.pem
         shell: bash
         run: |
-          rm -rf $HOME/.ssh
-          mkdir -p $HOME/.ssh
-          echo "$PKGMAKE_PRIVATE_KEY" > $HOME/.ssh/private.pem
-          echo "$PKGMAKE_PRIVATE_KEY" > $HOME/.ssh/privkey.pem
-          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > $HOME/.ssh/id_rsa
-          chmod 700 $HOME/.ssh
-          chmod 600 $HOME/.ssh/private.pem
-          chmod 600 $HOME/.ssh/privkey.pem
-          chmod 600 $HOME/.ssh/id_rsa
-          ssh-keygen -y -f $HOME/.ssh/id_rsa > $HOME/.ssh/id_rsa.pub || true
-          ssh-keygen -l -f $HOME/.ssh/id_rsa || true
-          touch $HOME/.ssh/known_hosts || true
-          ssh-keyscan -p ${{ secrets.SERVER_PORT }}      -H ${{ secrets.SERVER_HOST }}      >> $HOME/.ssh/known_hosts" || true
-          ssh-keyscan -p ${{ secrets.TS_VOIDREPO_PORT }} -H ${{ secrets.TS_VOIDREPO_HOST }} >> $HOME/.ssh/known_hosts" || true
+          rm -rf "$HOME/.ssh"
+          mkdir -p "$HOME/.ssh"
+
+          echo "$PKGMAKE_PRIVATE_KEY" > "$HOME/.ssh/private.pem"
+          echo "$PKGMAKE_PRIVATE_KEY" > "$HOME/.ssh/privkey.pem"
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > "$HOME/.ssh/id_rsa"
+
+          chmod 700 "$HOME/.ssh"
+          chmod 600 "$HOME/.ssh/private.pem"
+          chmod 600 "$HOME/.ssh/privkey.pem"
+          chmod 600 "$HOME/.ssh/id_rsa"
+
+          ssh-keygen -y -f "$HOME/.ssh/id_rsa" > "$HOME/.ssh/id_rsa.pub" || true
+          ssh-keygen -l -f "$HOME/.ssh/id_rsa" || true
+
+          touch "$HOME/.ssh/known_hosts"
+
+          ssh-keyscan -p "${{ secrets.SERVER_PORT }}"      -H "${{ secrets.SERVER_HOST }}"      >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
+          ssh-keyscan -p "${{ secrets.TS_VOIDREPO_PORT }}" -H "${{ secrets.TS_VOIDREPO_HOST }}" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
 
       - name: Create .chili-make-repo.conf
         shell: bash
