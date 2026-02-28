@@ -75,6 +75,15 @@ jobs:
           rm -rf "$HOME/.ssh"
           mkdir -p "$HOME/.ssh"
 
+          {
+            echo "Host repo"
+            echo "  HostName ${{ secrets.SERVER_HOST }}"
+            echo "  Port ${{ secrets.SERVER_PORT }}"
+            echo "  User ${{ secrets.SERVER_USER }}"
+            echo "  IdentityFile ~/.ssh/id_rsa"
+            echo "  IdentitiesOnly yes"
+          ) > $HOME/.ssh/config
+
           echo "$PKGMAKE_PRIVATE_KEY" > "$HOME/.ssh/private.pem"
           echo "$PKGMAKE_PRIVATE_KEY" > "$HOME/.ssh/privkey.pem"
           printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > "$HOME/.ssh/id_rsa"
@@ -100,10 +109,10 @@ jobs:
             echo "GPGKEY=A0D5A8312A83940ED8B04B0F4BAC871802E960F1"
             echo "SECRETKEY=lg63771588@"
             echo "local_PATH=$HOME/repodir"
-            echo "remote_HOST=repo.chililinux.com"
-            echo "remote_USER=u537062342"
-            echo "remote_PATH=/home/u537062342/domains/chililinux.com/public_html/void/current"
-            echo "remote_PORT=65002"
+            echo "remote_HOST=${{ secrets.SERVER_HOST }}"
+            echo "remote_USER=${{ secrets.SERVER_USER }}"
+            echo "remote_PATH=/home/${{ secrets.SERVER_USER }}/domains/chililinux.com/public_html/void/current"
+            echo "remote_PORT=${{ secrets.SERVER_PORT }}"
             echo "PACKAGER='Vilmar Catafesta <gmail.com>'"
             echo "prefix_DB=void"
           } > $HOME/.chili-make-repo.conf
