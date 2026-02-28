@@ -52,8 +52,13 @@ jobs:
           fetch-depth: 1
 
       - name: Checkout de outro repositório
+        uses: actions/checkout@v4
+        with:
+          repository: vcatafesta/gitrepo
+          fetch-depth: 1
+          path: gitrepo
+
+      - name: Build pkg
         run: |
-          cd /workspace
-          git clone --depth 1 https://github.com/vcatafesta/gitrepo.git
           cd gitrepo/pkgfile
           pkgmake -s
