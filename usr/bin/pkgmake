@@ -1031,9 +1031,12 @@ sh_create_INSTALL() {
 			echo
 
 			# ⚠️ aqui é o ponto-chave: a função é EXPANDIDA AGORA
-			declare -f pre_install
-			echo
-			declare -f post_install
+			#declare -f pre_install
+			#echo
+			#declare -f post_install
+      declare -f pre_install | sed -E 's/^[[:space:]]*function[[:space:]]+//'
+      echo
+      declare -f post_install | sed -E 's/^[[:space:]]*function[[:space:]]+//'
 			echo
 			echo 'ACTION="$1"'
 			echo 'action="$1"'
