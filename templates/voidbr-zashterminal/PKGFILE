@@ -3,7 +3,7 @@
 pkgbase=zashterminal
 pkgname=voidbr-zashterminal
 pkgver=$(date +%Y%m%d)
-pkgrel=1
+pkgrel=$(date +%H%M)
 pkgdesc="A modern GTK4/Adwaita terminal emulator with advanced session management, SSH integration, and security features."
 arch=('any')
 url="https://github.com/leoberbert/zashterminal"
