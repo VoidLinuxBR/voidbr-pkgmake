@@ -88,7 +88,7 @@ jobs:
             echo "  User $SERVER_USER"
             echo "  IdentityFile ~/.ssh/id_rsa"
             echo "  IdentitiesOnly yes"
-          ) > $HOME/.ssh/config
+          }  > "$HOME/.ssh/config"
 
           echo "$PKGMAKE_PRIVATE_KEY" > "$HOME/.ssh/private.pem"
           echo "$PKGMAKE_PRIVATE_KEY" > "$HOME/.ssh/privkey.pem"
@@ -98,6 +98,7 @@ jobs:
           chmod 600 "$HOME/.ssh/private.pem"
           chmod 600 "$HOME/.ssh/privkey.pem"
           chmod 600 "$HOME/.ssh/id_rsa"
+          chmod 600 "$HOME/.ssh/config"
 
           ssh-keygen -y -f "$HOME/.ssh/id_rsa" > "$HOME/.ssh/id_rsa.pub" || true
           ssh-keygen -l -f "$HOME/.ssh/id_rsa" || true
@@ -121,7 +122,7 @@ jobs:
             echo "remote_PORT=$SERVER_PORT"
             echo "PACKAGER='Vilmar Catafesta <gmail.com>'"
             echo "prefix_DB=void"
-          } > $HOME/.chili-make-repo.conf
+          } > "$HOME/.chili-make-repo.conf"
 
       - name: Build pkg
         shell: bash
