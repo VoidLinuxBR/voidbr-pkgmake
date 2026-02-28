@@ -47,9 +47,7 @@ package() {
 }
 
 post_install() {
-	#!/bin/bash
-#	set -euo pipefail
-
+  #	set -euo pipefail
 	PACKAGE_NAME="zashterminal"
 	DESKTOP_ID="org.leoberbert.zashterminal"
 	REPO_URL="https://github.com/leoberbert/zashterminal.git"
