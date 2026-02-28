@@ -12,6 +12,11 @@ on:
         description: "With TMATE"
         required: false
         default: false
+      packager:
+        type: string
+        description: "Empacotador"
+        required: true
+        default: 'Vilmar Catafesta <vcatafesta@gmail.com>
 
   #  schedule:  # Executa automaticamente toda sexta-feira às 05:00
   #    - cron: '0 5 * * 5'
