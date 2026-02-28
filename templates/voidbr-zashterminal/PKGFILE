@@ -74,18 +74,19 @@ post_install() {
   fi
   # ------------------------------------------------------
 
-	log() {
-    echo "${CYAN}[*]${RESET} $pkgname - $*"
-	}
+  log() {
+    printf "%s[*]%s %s - %s\n" "$CYAN" "$RESET" "$pkgname" "$*" >&2
+  }
 
-	warn() {
-    echo "${YELLOW}[*]WARNING: ${RESET} $pkgname - $*" >&2
-	}
+  warn() {
+    printf "%s[*]WARNING:%s %s - %s\n" "$YELLOW" "$RESET" "$pkgname" "$*" >&2
+    exit 1
+  }
 
-	die() {
-    echo "${YELLOW}[*]FATAL: ${RESET} $pkgname - $*" >&2
-		exit 1
-	}
+  die() {
+    printf "%s[*]FATAL:%s %s - %s\n" "$RED" "$RESET" "$pkgname" "$*" >&2
+    exit 1
+  }
 
 	require_cmd() {
 		command -v "$1" >/dev/null 2>&1 || die "Required command not found: $1"
