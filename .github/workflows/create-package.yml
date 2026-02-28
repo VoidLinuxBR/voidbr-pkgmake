@@ -78,8 +78,8 @@ jobs:
       - name: Create private.pem
         shell: bash
         run: |
-          rm -rf "$HOME/.ssh"
-          mkdir -p "$HOME/.ssh"
+          rm -rf "/root/.ssh"
+          mkdir -p "/root/.ssh"
 
           {
             echo "Host repo"
@@ -88,25 +88,25 @@ jobs:
             echo "  User $SERVER_USER"
             echo "  IdentityFile ~/.ssh/id_rsa"
             echo "  IdentitiesOnly yes"
-          }  > "$HOME/.ssh/config"
+          }  > "/root/.ssh/config"
 
-          echo "$PKGMAKE_PRIVATE_KEY" > "$HOME/.ssh/private.pem"
-          echo "$PKGMAKE_PRIVATE_KEY" > "$HOME/.ssh/privkey.pem"
-          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_rsa"
+          echo "$PKGMAKE_PRIVATE_KEY" > "/root/.ssh/private.pem"
+          echo "$PKGMAKE_PRIVATE_KEY" > "/root/.ssh/privkey.pem"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "/root/.ssh/id_rsa"
 
-          chmod 700 "$HOME/.ssh"
-          chmod 600 "$HOME/.ssh/private.pem"
-          chmod 600 "$HOME/.ssh/privkey.pem"
-          chmod 600 "$HOME/.ssh/id_rsa"
-          chmod 600 "$HOME/.ssh/config"
+          chmod 700 "/root/.ssh"
+          chmod 600 "/root/.ssh/private.pem"
+          chmod 600 "/root/.ssh/privkey.pem"
+          chmod 600 "/root/.ssh/id_rsa"
+          chmod 600 "/root/.ssh/config"
 
-          ssh-keygen -y -f "$HOME/.ssh/id_rsa" > "$HOME/.ssh/id_rsa.pub" || true
-          ssh-keygen -l -f "$HOME/.ssh/id_rsa" || true
+          ssh-keygen -y -f "/root/.ssh/id_rsa" > "/root/.ssh/id_rsa.pub" || true
+          ssh-keygen -l -f "/root/.ssh/id_rsa" || true
 
-          touch "$HOME/.ssh/known_hosts"
+          touch "/root/.ssh/known_hosts"
 
-          ssh-keyscan -p "$SERVER_PORT"      -H "$SERVER_HOST"      >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
-          ssh-keyscan -p "$TS_VOIDREPO_PORT" -H "$TS_VOIDREPO_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
+          ssh-keyscan -p "$SERVER_PORT"      -H "$SERVER_HOST"      >> "/root/.ssh/known_hosts" 2>/dev/null || true
+          ssh-keyscan -p "$TS_VOIDREPO_PORT" -H "$TS_VOIDREPO_HOST" >> "/root/.ssh/known_hosts" 2>/dev/null || true
 
       - name: Create .chili-make-repo.conf
         shell: bash
