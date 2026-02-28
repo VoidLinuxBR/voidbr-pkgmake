@@ -33,7 +33,8 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    #runs-on: ubuntu-latest
+    runs-on: self-hosted
     env:
       DEBUG: true
       TERM: xterm
