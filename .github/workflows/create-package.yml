@@ -65,6 +65,7 @@ jobs:
         shell: bash
         run: |
           echo "$PKGMAKE_PRIVATE_KEY" > $HOME/.ssh/private.pem
+          echo "$PKGMAKE_PRIVATE_KEY" > $HOME/.ssh/privkey.pem
 
       - name: Build pkg
         shell: bash
