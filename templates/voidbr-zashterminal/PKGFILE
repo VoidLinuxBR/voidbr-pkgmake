@@ -1,0 +1,40 @@
+# Maintainer: Robson Nakane <theblizzard@hotmail.com>
+
+pkgbase=zashterminal
+pkgname=voidbr-zashterminal
+pkgver=$(date +%Y%m%d)
+pkgrel=1
+pkgdesc="A modern GTK4/Adwaita terminal emulator with advanced session management, SSH integration, and security features."
+arch=('any')
+url="https://github.com/leoberbert/zashterminal"
+license=('GPL3')
+depends=(python3 python3-pip git rsync sshpass gettext gtk4 libadwaita vte3-gtk4 libsecret gobject-introspection python3-gobject python3-cairo python3-requests python3-psutil python3-Pygments)
+makedepends=(python3-regex python3-py7zr python3-setproctitle python3-cryptography)
+#source=("git+${url}.git")
+source=("${pkgbase}::git+${url}.git")
+sha256sums=('SKIP')
+
+build() {
+	cd "${srcdir}/$pkgbase"
+	find locale -name '*.po' -print0 | while IFS= read -r -d '' po; do
+		lang=$(basename "${po%.po}")
+		out="usr/share/locale/${lang}/LC_MESSAGES/zashterminal.mo"
+		mkdir -p "$(dirname "$out")"
+		msgfmt -o "$out" "$po"
+	done
+	uv build --wheel
+}
+
+package() {
+	cd "${srcdir}/$pkgbase"
+
+	python -m installer --destdir="$pkgdir" dist/*.whl
+
+	if [ -d "usr/share" ]; then
+		mkdir -p "$pkgdir/usr"
+		cp -ra usr/share "$pkgdir/usr/"
+	fi
+
+	install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+	install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}
