@@ -125,7 +125,7 @@ jobs:
               echo "GPGKEY=A0D5A8312A83940ED8B04B0F4BAC871802E960F1"
               echo "SECRETKEY=lg63771588@"
               echo "local_PATH=$HOME/repodir"
-              echo "remote_HOST=$SERVER_HOST"
+              echo "remote_HOST=repo.chililinux.com"
               echo "remote_USER=$SERVER_USER"
               echo "remote_PATH=/home/$SERVER_USER/domains/chililinux.com/public_html/void/current"
               echo "remote_PORT=$SERVER_PORT"
