@@ -87,34 +87,31 @@ jobs:
       - name: Create private.pem
         shell: bash
         run: |
-          cpath=('/root', "$HOME")
-          for cdir in "${cpath[@]}"; do
-            rm -rf "$cdir/.ssh" || true
-            mkdir -p "$cdir/.ssh" || true
+          rm -rf /root/.ssh || true
+          mkdir -p root/.ssh || true
 
-            {
-              echo "Host repo"
-              echo "  HostName $SERVER_HOST"
-              echo "  Port $SERVER_PORT"
-              echo "  User $SERVER_USER"
-              echo "  IdentityFile ~/.ssh/id_rsa"
-              echo "  IdentitiesOnly yes"
-            }  > "$cdir/.ssh/config"
+          {
+            echo "Host repo"
+            echo "  HostName $SERVER_HOST"
+            echo "  Port $SERVER_PORT"
+            echo "  User $SERVER_USER"
+            echo "  IdentityFile ~/.ssh/id_rsa"
+            echo "  IdentitiesOnly yes"
+          }  > /root/.ssh/config
 
-            echo "$PKGMAKE_PRIVATE_KEY" > "$cdir/.ssh/private.pem"
-            echo "$PKGMAKE_PRIVATE_KEY" > "$cdir/.ssh/privkey.pem"
-            printf '%s\n' "$SSH_PRIVATE_KEY" > "$cdir/.ssh/id_rsa"
-            chmod 700 "$cdir/.ssh" || true
-            chmod 600 "$cdir/.ssh/private.pem" || true
-            chmod 600 "$cdir/.ssh/privkey.pem" || true
-            chmod 600 "$cdir/.ssh/id_rsa" || true
-            ssh-keygen -y -f "$cdir/.ssh/id_rsa" > "$cdir/.ssh/id_rsa.pub" || true
-          done
-          rm "/root/.ssh/known_hosts" || true
+          echo "$PKGMAKE_PRIVATE_KEY" > /root/.ssh/private.pem
+          echo "$PKGMAKE_PRIVATE_KEY" > /root/.ssh/privkey.pem
+          printf '%s\n' "$SSH_PRIVATE_KEY" > /root/.ssh/id_rsa
+          chmod 700 /root/.ssh || true
+          chmod 600 /root/.ssh/private.pem || true
+          chmod 600 /root/.ssh/privkey.pem || true
+          chmod 600 /root/.ssh/id_rsa || true
+          ssh-keygen -y -f /root/.ssh/id_rsa > /root/.ssh/id_rsa.pub || true
+          rm /root/.ssh/known_hosts || true
           ssh-keyscan -p "$SERVER_PORT" repo.chililinux.com >> /root/.ssh/known_hosts
           ssh-keyscan -p "$SERVER_PORT" 147.93.38.151 >> /root/.ssh/known_hosts
-          ssh-keyscan -p "$TS_VOIDREPO_PORT" "$TS_VOIDREPO_HOST" >> "/root/.ssh/known_hosts" 2>/dev/null || true
-          chmod 600 "/root/.ssh/known_hosts" || true
+          ssh-keyscan -p "$TS_VOIDREPO_PORT" "$TS_VOIDREPO_HOST" >> /root/.ssh/known_hosts 2>/dev/null || true
+          chmod 600 /root/.ssh/known_hosts || true
 
       - name: Create .chili-make-repo.conf
         shell: bash
