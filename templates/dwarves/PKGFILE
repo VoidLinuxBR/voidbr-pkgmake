@@ -1,0 +1,29 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=pahole
+pkgdesc="Type info tools"
+pkgver=1.1.31
+pkgrel=1
+archs=("x86_64")
+desc="XFCE media player"
+license=("GPL-2.0-or-later")
+homepage="https://docs.xfce.org/apps/parole/start"
+url="https://git.kernel.org/pub/scm/devel/pahole/pahole"
+source=("git+${url}.git")
+sha256sums=("SKIP")
+depends=()
+makedepends=()
+
+build() {
+  pushd $srcdir/${pkgname} || exit 1
+  mkdir build
+  cd build
+  cmake ..
+  make
+  popd
+}
+
+package() {
+  pushd $srcdir/${pkgname}/build
+  make DESTDIR=$DESTDIR install
+}
