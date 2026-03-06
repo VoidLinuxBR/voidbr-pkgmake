@@ -1,0 +1,14 @@
+KERNEL=="sd*", ATTRS{idVendor}=="a69c", ATTRS{idProduct}=="5721",  SYMLINK+="aicudisk", RUN+="/usr/bin/eject /dev/%k"
+# UGREEN CM760
+KERNEL=="sd*", ATTRS{idVendor}=="a69c", ATTRS{idProduct}=="5722",  SYMLINK+="aicudiskv2", RUN+="/usr/bin/eject /dev/%k"
+KERNEL=="sd*", ATTRS{idVendor}=="a69c", ATTRS{idProduct}=="5723",  SYMLINK+="tendaudisk", RUN+="/usr/bin/eject /dev/%k"
+# UGREEN CM762
+KERNEL=="sd*", ATTRS{idVendor}=="a69c", ATTRS{idProduct}=="5724",  SYMLINK+="ugreenudisk", RUN+="/usr/bin/eject /dev/%k"
+KERNEL=="sd*", ATTRS{idVendor}=="a69c", ATTRS{idProduct}=="5725",  SYMLINK+="tendaudiskv2", RUN+="/usr/bin/eject /dev/%k"
+KERNEL=="sd*", ATTRS{idVendor}=="a69c", ATTRS{idProduct}=="5726",  SYMLINK+="tendaudiskv3", RUN+="/usr/bin/eject /dev/%k"
+KERNEL=="sd*", ATTRS{idVendor}=="a69c", ATTRS{idProduct}=="5727",  SYMLINK+="tendaudiskv4", RUN+="/usr/bin/eject /dev/%k"
+KERNEL=="sd*", ATTRS{idVendor}=="a69c", ATTRS{idProduct}=="572a",  SYMLINK+="tendaudiskv5", RUN+="/usr/bin/eject /dev/%k"
+# Cudy WU900 
+KERNEL=="sd*", ATTRS{idVendor}=="a69c", ATTRS{idProduct}=="572c",  SYMLINK+="cudyudisk", RUN+="/usr/bin/eject /dev/%k"
+# Cudy WU300
+KERNEL=="sd*", ATTRS{idVendor}=="a69c", ATTRS{idProduct}=="572e",  SYMLINK+="cudyudisk", RUN+="/usr/bin/eject /dev/%k"

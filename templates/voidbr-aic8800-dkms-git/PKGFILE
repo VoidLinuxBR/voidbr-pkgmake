@@ -1,0 +1,74 @@
+# Maintainer: xx777 <zenmchen at gmail dot com>
+
+_pkgbase=aic8800
+pkgname=voidbr-aic8800-dkms-git
+pkgver=r10.0af2cea
+pkgrel=1
+pkgdesc="Linux Driver for AIC8800 chipsets"
+arch=('any')
+url="https://github.com/a5a5aa555oo/aic8800"
+license=('GPL-2.0-or-later' 'UNKNOWN')
+makedepends=('git')
+depends=('dkms')
+
+source=("git+https://github.com/a5a5aa555oo/aic8800")
+sha512sums=("SKIP")
+
+pkgver() {
+  cd "$srcdir/$_pkgbase"
+  printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+prepare() {
+  cd "$srcdir/$_pkgbase"
+
+  sed -i \
+    -e "/POST_INSTALL/d" \
+    -e "/PACKAGE_VERSION/d" \
+    dkms.conf
+
+  printf 'PACKAGE_VERSION="@PKGVER@"\n' >> dkms.conf
+}
+
+package() {
+  cd "$srcdir/$_pkgbase"
+
+  dest="$pkgdir/usr/src/${_pkgbase}-${pkgver}"
+
+  install -d "$dest"
+
+  cp -r aic8800_fdrv "$dest/"
+  cp -r aic_load_fw "$dest/"
+
+  install -Dm644 Makefile "$dest/Makefile"
+  install -Dm644 dkms.conf "$dest/dkms.conf"
+
+  install -d "$pkgdir/usr/lib/firmware/aic8800D80"
+  install -d "$pkgdir/usr/lib/firmware/aic8800DC"
+
+  cp -r firmware/aic8800D80/* "$pkgdir/usr/lib/firmware/aic8800D80/"
+  cp -r firmware/aic8800DC/* "$pkgdir/usr/lib/firmware/aic8800DC/"
+
+  install -Dm644 aic.rules "$pkgdir/usr/lib/udev/rules.d/aic.rules"
+
+  sed -i "s/@PKGVER@/${pkgver}/" "$dest/dkms.conf"
+}
+
+post_install() {
+  dkms add /usr/src/aic8800-r10.0af2cea
+  dkms build -m aic8800 -v r10.0af2cea
+  dkms install -m aic8800 -v r10.0af2cea
+  dkms status
+  depmod -a
+  modprobe aic8800_fdrv
+  echo aic8800_fdrv /etc/modules-load.d/aic8800.conf
+}
+
+post_remove() {
+  rm -f /etc/modules-load.d/aic8800.conf
+  if dkms status | grep -q aic8800; then
+    dkms remove aic8800/r10.0af2cea --all
+  fi
+  rm -rf /usr/src/aic8800-r10.0af2cea
+  depmod -a
+}
