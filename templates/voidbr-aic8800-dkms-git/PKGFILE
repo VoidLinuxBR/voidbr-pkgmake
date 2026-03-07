@@ -64,7 +64,7 @@ post_install() {
   echo aic8800_fdrv /etc/modules-load.d/aic8800.conf
 }
 
-post_remove() {
+pre_remove() {
   rm -f /etc/modules-load.d/aic8800.conf
   if dkms status | grep -q aic8800; then
     dkms remove aic8800/r10.0af2cea --all

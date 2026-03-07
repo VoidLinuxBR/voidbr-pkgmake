@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=voidbr-turbo
+pkgbase=turbo
+pkgdesc="Turbo is an experimental text editor for the terminal, based on the Scintilla"
+pkgver=1.0.0
+pkgrel=1
+arch=(x86_64)
+license=('MIT')
+url="https://github.com/vcatafesta/turbo"
+source=(git+https://github.com/vcatafesta/turbo)
+makedepends=(cmake gcc libgpm)
+
+build() {
+	echo "$srcdir/$pkgbase"
+  cd "$srcdir/$pkgbase"
+  cmake . -DCMAKE_BUILD_TYPE=Release && # Or 'RelWithDebInfo', or 'MinSizeRel', or 'Debug'.
+  cmake --build .
+
+}
+
+package() {
+	cd "$srcdir/$pkgbase"
+	DESTDIR="$pkgdir" cmake --install .
+}
