@@ -3,7 +3,7 @@
 _pkgbase=aic8800
 pkgname=voidbr-aic8800-dkms-git
 pkgver=r10.0af2cea
-pkgrel=1
+pkgrel=3
 pkgdesc="Linux Driver for AIC8800 chipsets"
 arch=('any')
 url="https://github.com/a5a5aa555oo/aic8800"
@@ -55,7 +55,7 @@ package() {
 }
 
 post_install() {
-  dkms add /usr/src/aic8800-r10.0af2cea
+  dkms add -m aic8800 -v r10.0af2cea
   dkms build -m aic8800 -v r10.0af2cea
   dkms install -m aic8800 -v r10.0af2cea
   dkms status
