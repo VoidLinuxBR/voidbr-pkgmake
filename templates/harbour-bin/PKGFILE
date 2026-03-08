@@ -27,3 +27,7 @@ package() {
       fi
    done
 }
+
+post_install() {
+    ldconfig
+}
