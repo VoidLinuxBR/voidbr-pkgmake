@@ -1026,10 +1026,10 @@ sh_create_REMOVE() {
       echo 'set -e'
       echo
 
-      # expande apenas se existir
-      pkg_has_fn pre_remove   && declare -f pre_remove
+			# ⚠️ aqui é o ponto-chave: a função é EXPANDIDA AGORA
+      pkg_has_fn pre_remove  && declare -f pre_remove | sed -E 's/^[[:space:]]*function[[:space:]]+//'
       echo
-      pkg_has_fn post_remove  && declare -f post_remove
+      pkg_has_fn post_remove  && declare -f post_remove | sed -E 's/^[[:space:]]*function[[:space:]]+//'
       echo
 
       echo 'ACTION="$1"'
@@ -1082,15 +1082,17 @@ sh_create_INSTALL() {
       echo 'set -e'
       echo
 
+			# ⚠️ aqui é o ponto-chave: a função é EXPANDIDA AGORA
       # expande apenas se existir
-      pkg_has_fn pre_install  && declare -f pre_install
+      pkg_has_fn pre_install  && declare -f pre_install | sed -E 's/^[[:space:]]*function[[:space:]]+//'
       echo
-      pkg_has_fn post_install && declare -f post_install
+      pkg_has_fn post_install && declare -f post_install | sed -E 's/^[[:space:]]*function[[:space:]]+//'
       echo
-      pkg_has_fn pre_upgrade  && declare -f pre_upgrade
+      pkg_has_fn pre_upgrade  && declare -f pre_upgrade | sed -E 's/^[[:space:]]*function[[:space:]]+//'
       echo
-      pkg_has_fn post_upgrade && declare -f post_upgrade
+      pkg_has_fn post_upgrade && declare -f post_upgrade | sed -E 's/^[[:space:]]*function[[:space:]]+//'
       echo
+
       echo 'ACTION="$1"'
       echo 'action="$1"'
       echo 'PKGNAME="$2"'
