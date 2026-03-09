@@ -5,7 +5,7 @@
 #  pkgmake — makepkg-like tool for Void XBPS
 #  Created: dom 21 dez 2025 11:47:51 -04
 #  Altered: dom 21 dez 2025 11:47:51 -04
-#  Updated: sáb 07 mar 2026 10:41:54 -04
+#  Updated: dom 08 mar 2026 23:22:17 -04
 #
 #  Copyright (c) 2019-2025, Vilmar Catafesta <vcatafesta@gmail.com>
 #  Assembled By Vilmar Catafesta for the ChiliLinux project.
@@ -46,7 +46,7 @@ set -o pipefail
 
 #system
 declare APP="${0##*/}"
-declare _VERSION_="1.03.07-20260307"
+declare _VERSION_="1.03.08-20260308"
 declare APPDESC="$APP - Wraper for xbps-create"
 declare distro="$(uname -n)"
 declare DEPENDENCIES=(tput)
@@ -78,6 +78,9 @@ KEY_FILE="privkey.pem"
 
 PKGDEST=""
 CLI_PKGDEST=""
+
+PACKAGER=""
+CLI_PACKAGER=""
 
 REINDEX_FORCE="${REINDEX_FORCE:-0}"
 CLI_REINDEX=
@@ -620,6 +623,15 @@ validate_pkgdest_sanity() {
 		die "PKGDEST inválido: $PKGDEST"
 		;;
 	esac
+}
+
+validate_packager_sanity() {
+  echo "PACKAGER-$PACKAGER"
+  [[ -z "$PACKAGER" ]] && die "PACKAGER inválido: $PACKAGER (esperado: Nome Sobrenome <email@dominio>)"
+  regex='^[^<>]+ <[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}>$'
+  if [[ ! "$PACKAGER" =~ $regex ]]; then
+    die "PACKAGER inválido: $PACKAGER"
+  fi
 }
 
 cmd_run() {
@@ -1453,6 +1465,7 @@ ${bold}Opções:${reset}
   ${green}-c|--clean${reset}                       Limpar diretórios de trabalho
   ${green}-p|--print-config${reset}                Imprimir configuracao do /etc/pkgmake.conf
   ${green}-k|--pkgdest${reset} ${yellow}<path>${reset}              Diretório local onde os pacotes (.xbps) e o repodata serão gerados
+  ${green}  |--packager${reset} ${yellow}<nome>${reset}             Nome Empacotador
   ${green}new ${yellow}<pacote>${reset}                     Criar esqueleto básico de PKGFILE
   ${green}new --from-arch ${yellow}<pacote>${reset}         Importar PKGBUILD do Arch/AUR (requer revisão manual)
   ${green}new --from-voidlinuxbr ${yellow}<pacote>${reset}  Importar template de pacote da Comunidade VoidLinuxBR (requer revisão manual)
@@ -1658,6 +1671,22 @@ resolve_pkgdest() {
 	PKGDEST="$dest"
 }
 
+resolve_packager() {
+	local packager
+
+	if [[ -n "$CLI_PACKAGER" ]]; then
+		packager="$CLI_PACKAGER"
+	elif [[ -n "$PACKAGER" ]]; then
+		packager="$PACKAGER"
+	else
+		die "PACKAGER não definido (use --packager ou /etc/pkgmake.conf)"
+	fi
+
+	validate_packager_sanity
+
+	PACKAGER="$packager"
+}
+
 resolve_signpkg() {
 	if [[ -n "$CLI_SIGNPKG" ]]; then
 		SIGNPKG="$CLI_SIGNPKG"
@@ -1860,8 +1889,22 @@ while [[ $# -gt 0 ]]; do
 		print_config
 		exit 0
 		;;
-	-k | --pkgdest)
-		CLI_PKGDEST="$2"
+  -k | --pkgdest)
+    if [[ $# -lt 2 || "$2" == -* ]]; then
+      die "opção '$1' requer um argumento (diretório de destino)"
+    fi
+    CLI_PKGDEST="$2"
+    shift 2
+    ;;
+  --packager)
+    if [[ -z "$2" || "$2" == -* ]]; then
+      die "opção '--packager' requer um argumento: 'Nome Completo <email>'"
+    fi
+    CLI_PACKAGER="$2"
+    shift 2
+    ;;
+	--packager)
+		CLI_PACKAGER="$2"
 		shift 2
 		;;
 	-h | --help)
@@ -1910,6 +1953,7 @@ resolve_syncdeps
 resolve_signpkg
 resolve_verbose
 resolve_pkgdest # blindagem de path + permissão (ANTES de tudo)
+resolve_packager
 load_pkgfile
 sanitize_pkgfile_vars
 resolve_sources
