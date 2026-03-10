@@ -1,7 +1,7 @@
 # Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
 
-pkgname=google-chrome
-pkgver=145.0.7632.116
+pkgname=voidbr-google-chrome
+pkgver=145.0.7632.159
 pkgrel=1
 pkgdesc="The popular web browser by Google (Stable Channel)"
 arch=('x86_64')
@@ -17,6 +17,7 @@ source=("https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-${_cha
 sha512sums=('7898b88e9b989b6b934bb864d98ba41be4f9e234e782fbf53822873675e86660292ff69f34135f6cbf319725849985cc75cf2277d3468142ffdc62e35e745c61'
 	'a225555c06b7c32f9f2657004558e3f996c981481dbb0d3cd79b1d59fa3f05d591af88399422d3ab29d9446c103e98d567aeafe061d9550817ab6e7eb0498396'
 	'de02b498a4b5b93e21622c8dba57befe795d733a04656be911cc38e28bfef0e20470450f44be523bbde8d4de28f79c10434846ca01fc2a2f4e67707b79332f94')
+makedepends=(bsdtar)
 
 package() {
 	echo $pkgdir
