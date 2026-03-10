@@ -5,9 +5,9 @@
 #  pkgmake — makepkg-like tool for Void XBPS
 #  Created: dom 21 dez 2025 11:47:51 -04
 #  Altered: dom 21 dez 2025 11:47:51 -04
-#  Updated: dom 08 mar 2026 23:22:17 -04
+#  Updated: ter 10 mar 2026 12:25:23 -04
 #
-#  Copyright (c) 2019-2025, Vilmar Catafesta <vcatafesta@gmail.com>
+#  Copyright (c) 2019-2026, Vilmar Catafesta <vcatafesta@gmail.com>
 #  Assembled By Vilmar Catafesta for the ChiliLinux project.
 #  All rights reserved.
 #
@@ -46,7 +46,7 @@ set -o pipefail
 
 #system
 declare APP="${0##*/}"
-declare _VERSION_="1.03.08-20260308"
+declare _VERSION_="1.03.10-20260310"
 declare APPDESC="$APP - Wraper for xbps-create"
 declare distro="$(uname -n)"
 declare DEPENDENCIES=(tput)
@@ -931,7 +931,7 @@ extract() {
 	local extracted=0
 	shopt -s nullglob
 
-	for f in *.tar *.tar.gz *.tgz *.tar.xz *.tar.bz2 *.tar.zst; do
+  for f in *.tar *.tar.gz *.tgz *.tar.xz *.tar.bz2 *.tar.zst *.deb; do
 		case "$f" in
 		*.tar.gz | *.tgz)
 			cmd_run tar -xzf "$f" && extracted=1 || die "falha ao extrair $f"
@@ -948,6 +948,11 @@ extract() {
 		*.tar)
 			cmd_run tar -xf "$f" && extracted=1 || die "falha ao extrair $f"
 			;;
+     *.deb)
+      cmd_run ar x "$f" && \
+      cmd_run tar -xf data.tar.* && \
+      extracted=1 || die "falha ao extrair $f"
+      ;;
 		esac
 	done
 
