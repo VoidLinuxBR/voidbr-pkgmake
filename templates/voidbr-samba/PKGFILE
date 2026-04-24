@@ -4,7 +4,7 @@
 pkgname=voidbr-samba
 pkgbase=samba
 pkgdesc="SMB/CIFS file, print, and login server for Unix"
-pkgver=4.23.4
+pkgver=4.24.1
 pkgrel=1
 arch=(x86_64)
 license=('GPL-3.0-or-later')
