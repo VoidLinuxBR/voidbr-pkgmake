@@ -1,7 +1,7 @@
 #!/usr/bin/bash
 # Maintainer  : Vilmar Catafesta <vcatafesta@gmail.com>
 
-pkgname=void-utils
+pkgname=voidbr-utils
 pkgdesc="Utilitários do sistema essencias para uso diário no Void Linux"
 pkgver=$(date +%Y%m%d)
 pkgrel=$(date +%H%M)
