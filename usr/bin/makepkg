@@ -626,7 +626,7 @@ validate_pkgdest_sanity() {
 }
 
 validate_packager_sanity() {
-  echo "PACKAGER-$PACKAGER"
+	msg "PACKAGER=$PACKAGER"
   [[ -z "$PACKAGER" ]] && die "PACKAGER inválido: $PACKAGER (esperado: Nome Sobrenome <email@dominio>)"
   regex='^[^<>]+ <[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}>$'
   if [[ ! "$PACKAGER" =~ $regex ]]; then
