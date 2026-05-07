@@ -1,0 +1,37 @@
+# Maintainer  : Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=simplescreenrecorder
+pkgver=0.4.4
+pkgrel=4
+pkgdesc="A feature-rich screen recorder that supports X11 and OpenGL."
+arch=("x86_64")
+homepage="https://www.maartenbaert.be/simplescreenrecorder/"
+license=("GPL3")
+#depends=("qt5-base" "qt5-x11extras"
+#    "ffmpeg" "alsa-lib" "libpulse" "jack" "libgl" "glu"
+#    "libx11" "libxext" "libxfixes" "libxi" "libxinerama"
+#    "desktop-file-utils" "gtk-update-icon-cache")
+#source=("git+https://github.com/MaartenBaert/ssr.git#tag=$pkgver"
+#        ffmpeg7.patch::https://patch-diff.githubusercontent.com/raw/MaartenBaert/ssr/pull/1036.patch)
+
+package() {
+	local dirs=("usr" "etc" "opt")
+	#   echo "WORKDIR=$WORKDIR"
+	#   echo "DESTDIR=$DESTDIR"
+	#   echo "pkgdir=$pkgdir"
+	#   echo "srcdir=$srcdir"
+	#   echo "_pkgsrc=$_pkgsrc"
+
+	cd ${WORKDIR}
+	for dir in "${dirs[@]}"; do
+		if [ -d "${dir}" ]; then
+			cp -a "${dir}" "$DESTDIR/"
+		fi
+	done
+
+	# Install license file if present
+	if [ -f "LICENSE" ]; then
+		install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+	fi
+
+}
