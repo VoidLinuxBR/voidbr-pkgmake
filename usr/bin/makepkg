@@ -5,7 +5,7 @@
 #  pkgmake — makepkg-like tool for Void XBPS
 #  Created: dom 21 dez 2025 11:47:51 -04
 #  Altered: dom 21 dez 2025 11:47:51 -04
-#  Updated: ter 10 mar 2026 12:25:23 -04
+#  Updated: qua 06 mai 2026 20:22:09 -04
 #
 #  Copyright (c) 2019-2026, Vilmar Catafesta <vcatafesta@gmail.com>
 #  Assembled By Vilmar Catafesta for the ChiliLinux project.
@@ -46,7 +46,7 @@ set -o pipefail
 
 #system
 declare APP="${0##*/}"
-declare _VERSION_="1.03.10-20260310"
+declare _VERSION_="1.05.06-20260506"
 declare APPDESC="$APP - Wraper for xbps-create"
 declare distro="$(uname -n)"
 declare DEPENDENCIES=(tput)
@@ -931,30 +931,33 @@ extract() {
 	local extracted=0
 	shopt -s nullglob
 
-  for f in *.tar *.tar.gz *.tgz *.tar.xz *.tar.bz2 *.tar.zst *.deb; do
-		case "$f" in
-		*.tar.gz | *.tgz)
-			cmd_run tar -xzf "$f" && extracted=1 || die "falha ao extrair $f"
-			;;
-		*.tar.xz)
-			cmd_run tar -xJf "$f" && extracted=1 || die "falha ao extrair $f"
-			;;
-		*.tar.bz2)
-			cmd_run tar -xjf "$f" && extracted=1 || die "falha ao extrair $f"
-			;;
-		*.tar.zst)
-			cmd_run tar --zstd -xf "$f" && extracted=1 || die "falha ao extrair $f"
-			;;
-		*.tar)
-			cmd_run tar -xf "$f" && extracted=1 || die "falha ao extrair $f"
-			;;
-     *.deb)
+  for f in *.tar *.tar.gz *.tgz *.tar.xz *.tar.bz2 *.tar.zst *.deb *.zip; do
+    case "$f" in
+    *.tar.gz | *.tgz)
+      cmd_run tar -xzf "$f" && extracted=1 || die "falha ao extrair $f"
+      ;;
+    *.tar.xz)
+      cmd_run tar -xJf "$f" && extracted=1 || die "falha ao extrair $f"
+      ;;
+    *.tar.bz2)
+      cmd_run tar -xjf "$f" && extracted=1 || die "falha ao extrair $f"
+      ;;
+    *.tar.zst)
+      cmd_run tar --zstd -xf "$f" && extracted=1 || die "falha ao extrair $f"
+      ;;
+    *.tar)
+      cmd_run tar -xf "$f" && extracted=1 || die "falha ao extrair $f"
+      ;;
+    *.deb)
       cmd_run ar x "$f" && \
       cmd_run tar -xf data.tar.* && \
       extracted=1 || die "falha ao extrair $f"
       ;;
-		esac
-	done
+    *.zip)
+      cmd_run unzip -o "$f" && extracted=1 || die "falha ao extrair $f"
+      ;;
+    esac
+  done
 
 	shopt -u nullglob
 
@@ -1003,7 +1006,10 @@ detect_src() {
 		export wrksrc="${dirs[0]}"
 		;;
 	*)
-		die "múltiplos diretórios de source encontrados após extração"
+		#die "múltiplos diretórios de source encontrados após extração"
+		export srcdir="$SRCDIR"
+		export _pkgsrc="$SRCDIR"
+		export wrksrc="$SRCDIR"
 		;;
 	esac
 	export pkgdir="$PKGDIR"
