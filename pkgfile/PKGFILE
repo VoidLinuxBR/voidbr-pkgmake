@@ -21,6 +21,7 @@ depends=(
 	coreutils
 	ncurses
 	ncurses-devel
+	cmake
 )
 #conf_files=( /etc/pkgmake.conf /etc/vilmar.conf )
 backup=(/etc/pkgmake.conf)
