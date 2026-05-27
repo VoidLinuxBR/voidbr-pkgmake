@@ -13,7 +13,7 @@ license=("GPL3")
 #    "desktop-file-utils" "gtk-update-icon-cache")
 #source=("git+https://github.com/MaartenBaert/ssr.git#tag=$pkgver"
 #        ffmpeg7.patch::https://patch-diff.githubusercontent.com/raw/MaartenBaert/ssr/pull/1036.patch)
-
+depends=(libavformat)
 package() {
 	local dirs=("usr" "etc" "opt")
 	#   echo "WORKDIR=$WORKDIR"
