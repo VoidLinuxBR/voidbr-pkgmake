@@ -4,8 +4,7 @@
 #
 #  pkgmake — makepkg-like tool for Void XBPS
 #  Created: dom 21 dez 2025 11:47:51 -04
-#  Altered: dom 21 dez 2025 11:47:51 -04
-#  Updated: qua 06 mai 2026 20:22:09 -04
+#  Updated: qua 10 jun 2026 14:04:38 -04
 #
 #  Copyright (c) 2019-2026, Vilmar Catafesta <vcatafesta@gmail.com>
 #  Assembled By Vilmar Catafesta for the ChiliLinux project.
@@ -46,7 +45,7 @@ set -o pipefail
 
 #system
 declare APP="${0##*/}"
-declare _VERSION_="1.05.06-20260506"
+declare _VERSION_="1.06.10-20260610"
 declare APPDESC="$APP - Wraper for xbps-create"
 declare distro="$(uname -n)"
 declare DEPENDENCIES=(tput)
@@ -376,6 +375,8 @@ pkgdesc="Pacote exemplo"
 license=('MIT')
 homepage="https://homepage.com"
 depends=('bash>=0')
+provides=()
+replaces=()
 makedepends=()
 source=('https://homepage.com/file.tar.gz')
 backup=()
@@ -703,9 +704,11 @@ gen_key() {
 }
 
 normalize_dep_patterns() {
-	local var i dep
+	local var
+	local i
+	local dep
 
-	for var in depends makedepends; do
+	for var in depends makedepends provides replaces; do
 		declare -p "$var" &>/dev/null || continue
 		declare -n arr="$var"
 
@@ -718,7 +721,7 @@ normalize_dep_patterns() {
 			[[ "$dep" == "()" ]] && continue
 
 			case "$var" in
-			depends)
+			depends|replaces|provides)
 				# depends: se não tem operador, força >=0
 				if ! [[ "$dep" =~ [\<\>\=] ]]; then
 					arr[$i]="${dep}>=0"
@@ -743,7 +746,7 @@ normalize_dep_patterns() {
 
 normalize_deps() {
 	local v
-	for v in depends makedepends; do
+	for v in depends makedepends provides replaces; do
 		if declare -p "$v" &>/dev/null; then
 			# se não for array, converte string → array
 			if [[ "$(declare -p "$v")" != declare\ -a* ]]; then
@@ -1271,22 +1274,39 @@ run_all() {
 	resolve_conffiles
 
 	deps_list="${depends[*]}"
+    provides_list="${provides[*]}"
+    replaces_list="${replaces[*]}"
 
 	INSTALL_OPTS=()
 	[[ -f "$WORKDIR/INSTALL" ]] && INSTALL_OPTS+=(-S "$WORKDIR/INSTALL")
 	deps_quoted=$(printf "'%s'" "$deps_list")
 	conf_quoted=$(printf "'%s'" "$conf_files_arg")
+    provides_quoted=$(printf "'%s'" "$provides_list")
+    replaces_quoted=$(printf "'%s'" "$replaces_list")
 
-	msg "Create XBPS $PKGOUT"
-	cmd_run xbps-create \
-		--architecture "$ARCH" \
-		--pkgver "${pkgname}-${pkgver}_${pkgrel}" \
-		--desc "$pkgdesc" \
-		--maintainer "$PACKAGER" \
-		--license "$license" \
-		--dependencies "$deps_list" \
-		--config-files "$conf_files_arg" \
-		"$pkgdir"
+#	msg "Create XBPS $PKGOUT"
+#	cmd_run xbps-create \
+#		--architecture "$ARCH" \
+#		--pkgver "${pkgname}-${pkgver}_${pkgrel}" \
+#		--desc "$pkgdesc" \
+#		--maintainer "$PACKAGER" \
+#		--license "$license" \
+#		--dependencies "$deps_list" \
+#		--config-files "$conf_files_arg" \
+#		"$pkgdir"
+
+    msg "Create XBPS $PKGOUT"
+    cmd_run xbps-create \
+      --architecture "$ARCH" \
+      --pkgver "${pkgname}-${pkgver}_${pkgrel}" \
+      --desc "$pkgdesc" \
+      --maintainer "$PACKAGER" \
+      --license "$license" \
+      --dependencies "$deps_list" \
+      --provides "$provides_list" \
+      --replaces "$replaces_list" \
+      --config-files "$conf_files_arg" \
+      "$pkgdir"
 
 	# mover pacote para o repo local
 	mv -f "$PKGOUT" "$PKGDEST/"
@@ -1803,6 +1823,8 @@ sanitize_pkgfile_vars() {
 
 	# ---- arrays canônicos ----
 	declare -p depends &>/dev/null || depends=()
+    declare -p provides &>/dev/null || provides=()
+    declare -p replaces &>/dev/null || replaces=()
 	declare -p makedepends &>/dev/null || makedepends=()
 	declare -p license &>/dev/null || license=()
 }
