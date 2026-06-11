@@ -51,3 +51,20 @@ package() {
 	#	install -Dm644 etc/pkgmake.conf $DESTDIR/etc/pkgmake.conf.new-${pkgver}-${pkgrel}
 	install -Dm644 etc/pkgmake.conf $DESTDIR/etc/pkgmake.conf.new
 }
+
+pre_install() {
+  log "Starting installation"
+}
+
+post_install() {
+  log "Ending installation"
+}
+
+pre_upgrade() {
+  log "Starting upgrading"
+}
+
+post_upgrade() {
+  log "Ending upgrading"
+}
+

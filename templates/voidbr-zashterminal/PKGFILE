@@ -46,8 +46,8 @@ package() {
 	local dirs=("usr" "etc" "opt")
 	cd "${srcdir}/$pkgbase"
 
-  #corrigir uma merda do desenvolvedor
-  sed -i '1s|/bin/sh|/bin/bash|' usr/bin/zashterminal
+	#corrigir uma merda do desenvolvedor
+	sed -i '1s|/bin/sh|/bin/bash|' usr/bin/zashterminal
 
 	python -m installer --destdir="$pkgdir" dist/*.whl
 
@@ -198,5 +198,5 @@ EOF
 }
 
 post_upgrade() {
-  post_install
+	post_install
 }
