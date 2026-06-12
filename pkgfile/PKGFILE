@@ -53,18 +53,18 @@ package() {
 }
 
 pre_install() {
-  log "Starting installation"
+  log "Iniciando instalação"
 }
 
 post_install() {
-  log "Ending installation"
+  log "Finalizando instalação"
 }
 
 pre_upgrade() {
-  log "Starting upgrading"
+  log "Iniciando upgrade"
 }
 
 post_upgrade() {
-  log "Ending upgrading"
+  log "Finalizando upgrade"
 }
 
