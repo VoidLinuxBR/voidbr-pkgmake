@@ -4,7 +4,7 @@
 #
 #  pkgmake — makepkg-like tool for Void XBPS
 #  Created: dom 21 dez 2025 11:47:51 -04
-#  Updated: qua 10 jun 2026 14:04:38 -04
+#  Updated: qui 18 jun 2026 16:28:42 -04
 #
 #  Copyright (c) 2019-2026, Vilmar Catafesta <vcatafesta@gmail.com>
 #  Assembled By Vilmar Catafesta for the ChiliLinux project.
@@ -45,7 +45,7 @@ set -o pipefail
 
 #system
 declare APP="${0##*/}"
-declare _VERSION_="1.06.10-20260610"
+declare _VERSION_="1.06.18-20260618"
 declare APPDESC="$APP - Wraper for xbps-create"
 declare distro="$(uname -n)"
 declare DEPENDENCIES=(tput)
@@ -451,6 +451,71 @@ from_voidlinuxbr() {
 # Importa template oficial do Arch Linux
 # -------------------------------------------------------------------
 from_arch() {
+    local PKGNAME="$1"
+    local JSON
+    local PKGBASE
+    local REPO_URL
+    local DESTDIR="arch-$PKGNAME"
+
+    [[ -z "$PKGNAME" ]] && die "Uso: new --from-arch <pkgname>"
+    [[ -e "$DESTDIR" ]] && die "Diretório '$DESTDIR' já existe"
+
+    msg "Procurando pacote: $PKGNAME"
+
+    JSON="$(curl -fsSL \
+        "https://archlinux.org/packages/search/json/?name=${PKGNAME}")" \
+        || die "Falha ao consultar Arch Linux"
+
+    PKGBASE="$(
+        jq -r --arg pkg "$PKGNAME" '
+            .results[]
+            | select(.pkgname == $pkg)
+            | .pkgbase
+        ' <<< "$JSON" | head -n1
+    )"
+
+    if [[ -n "$PKGBASE" && "$PKGBASE" != "null" ]]; then
+        REPO_URL="https://gitlab.archlinux.org/archlinux/packaging/packages/${PKGBASE}.git"
+        msg "Pacote encontrado nos repositórios oficiais do Arch"
+    else
+        REPO_URL="https://aur.archlinux.org/${PKGNAME}.git"
+        msg "Pacote não encontrado no Arch. Tentando AUR"
+        DESTDIR="aur-$PKGNAME"
+    fi
+
+    git ls-remote --exit-code "$REPO_URL" &>/dev/null \
+        || die "Pacote '$PKGNAME' não encontrado"
+
+    cmd_run git clone --depth=1 "$REPO_URL" "$DESTDIR" \
+        || die "Erro ao clonar '$PKGNAME'"
+
+    cmd_run pushd "$DESTDIR" >/dev/null || die
+
+    find . -type f \( -name '*.toml' -o -name '.*.toml' \) -delete
+    find . -name '.SRCINFO' -type f -delete
+    rm -rf .git
+
+    {
+        echo "#!/usr/bin/env bash"
+        echo "# NOTE: Imported from Arch Linux/AUR"
+        echo
+        cat PKGBUILD
+    } > PKGFILE
+
+    #chmod +x PKGFILE
+    #rm -f PKGBUILD
+
+    cmd_run popd >/dev/null || true
+
+    msg "${DESTDIR}/PKGFILE criado com sucesso."
+    msg "Entre no diretório: ${yellow}cd $DESTDIR${rst}"
+}
+
+# -------------------------------------------------------------------
+# new --from-arch <pkgname>
+# Importa template oficial do Arch Linux
+# -------------------------------------------------------------------
+from_archOLD() {
 	local PKGNAME="$1"
 	local DIRPKGFILE="$2"
 
