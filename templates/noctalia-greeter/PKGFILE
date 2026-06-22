@@ -1,0 +1,84 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=noctalia-greeter
+_pkgname=noctalia-greeter
+pkgver=1.0.0.r32.g34599488c
+pkgrel=3
+pkgdesc="Greetd greeter for Noctalia"
+arch=('x86_64')
+url="https://github.com/noctalia-dev/noctalia-greeter"
+license=('MIT')
+options=('!debug')
+
+depends=(
+	'cairo'
+	'dbus'
+	'fontconfig'
+	'glib'
+	'glibc'
+	'greetd'
+	'libglvnd'
+	'librsvg'
+	'libwebp'
+	'libxkbcommon'
+	'pango'
+	'wayland'
+	'wlroots0.20'
+	freetype
+)
+makedepends=(
+	'git'
+	'meson'
+	'ninja'
+	'pkgconf'
+	'wayland-protocols'
+  librsvg-devel
+  wlroots0.20-devel
+)
+optdepends=(
+	'noctalia-git: Wallpaper and palette sync from Noctalia'
+)
+provides=()
+conflicts=()
+source=("git+${url}.git")
+sha256sums=('SKIP')
+
+pkgver() {
+	cd "${_pkgname}"
+
+	local version
+	version="$(sed -n "s/^  version: '\([^']*\)',/\1/p" meson.build)"
+	printf '%s.r%s.g%s' "${version}" "$(git rev-list --count HEAD)" "$(git rev-parse --short=9 HEAD)"
+}
+
+build() {
+	CXXFLAGS+=" -Wno-unused-result"
+	meson "${_pkgname}" build-release \
+		-Db_ndebug=true
+	meson compile -C build-release
+}
+
+package() {
+	meson install -C build-release --destdir "${pkgdir}"
+
+	install -Dm644 "${_pkgname}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+	install -Dm644 "${_pkgname}/README.md" "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+}
+
+post_install() {
+	if [[ ! -x /usr/bin/noctalia-greeter-apply-appearance ]]; then
+		return 0
+	fi
+
+	NOCTALIA_GREETER_SESSION_BIN=/usr/bin/noctalia-greeter-session \
+		/usr/share/noctalia-greeter/setup_greeter_system.sh || true
+
+	echo ""
+	echo "==> greetd should use: command = \"/usr/bin/noctalia-greeter-session\""
+	echo "==> Full config block: sudo noctalia-greeter-print-greetd-config"
+	echo ""
+}
+
+post_upgrade() {
+	post_install
+}
