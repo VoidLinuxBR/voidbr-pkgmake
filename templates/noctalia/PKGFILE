@@ -1,0 +1,86 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=noctalia
+_pkgname=noctalia
+pkgver=5.0.0.r1191.g39a4a335c
+pkgrel=12
+pkgdesc='Lightweight Wayland shell built directly on Wayland and OpenGL ES'
+arch=('x86_64')
+url='https://github.com/noctalia-dev/noctalia'
+license=('MIT')
+options=('!debug')
+depends=(
+	'cairo'
+	'curl'
+	'fontconfig'
+	'freetype'
+	'libgcc'
+	'glib'
+	'glibc'
+	'jemalloc'
+	'libglvnd'
+	'libpipewire'
+	'libqalculate'
+	'librsvg'
+	'libwebp'
+	'libxkbcommon'
+	'libxml2'
+	'pam'
+	'polkit'
+	'pango'
+	'sdbus-c++'
+	'wayland'
+)
+
+makedepends=(
+	'git'
+	'meson'
+	'ninja'
+	'pkgconf'
+	'wayland-protocols'
+	sdbus-c++-devel
+	libcurl-devel
+	libqalculate-devel
+)
+provides=()
+conflicts=()
+source=("${_pkgname}::git+${url}.git")
+sha256sums=('SKIP')
+
+pkgver() {
+	cd "${_pkgname}"
+
+	local version
+	version="$(sed -n "s/^  version: '\([^']*\)',/\1/p" meson.build)"
+	printf '%s.r%s.g%s' "${version}" "$(git rev-list --count HEAD)" "$(git rev-parse --short=9 HEAD)"
+}
+
+build() {
+	CXXFLAGS+=" -Wno-unused-result"
+	meson "${_pkgname}" build-release \
+		-Db_ndebug=true \
+		-Dtests=disabled
+	meson compile -C build-release
+}
+
+package() {
+	meson install -C build-release --destdir "${pkgdir}"
+	install -Dm644 "${_pkgname}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+	install -Dm644 "${_pkgname}/README.md" "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+}
+
+pre_install() {
+  log "Iniciando instalação"
+}
+
+post_install() {
+  log "Finalizando instalação"
+}
+
+pre_upgrade() {
+  log "Iniciando upgrade"
+}
+
+post_upgrade() {
+  log "Finalizando upgrade"
+}
