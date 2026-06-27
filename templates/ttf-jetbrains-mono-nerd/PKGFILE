@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# NOTE: Imported from Arch Linux/AUR
+
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgbase=ttf-jetbrains-mono-nerd
+pkgname=ttf-jetbrains-mono-nerd
+pkgdesc="Patched font JetBrains Mono from nerd fonts library"
+pkgver=3.4.0
+pkgrel=2
+arch=('any')
+url='https://github.com/ryanoasis/nerd-fonts'
+_urlbase="${url}/releases/download/v${pkgver}"
+license=('MIT' 'OFL-1.1')
+options=('!debug' '!strip')
+provides=()
+source=("jetbrainsmono-${pkgver}.tar.xz::${_urlbase}/JetBrainsMono.tar.xz")
+
+package() {
+  cd ${srcdir}
+  install -Dm644 *.ttf -t "${pkgdir}/usr/share/fonts/TTF"
+  install -Dm644 OFL.txt -t "${pkgdir}/usr/share/licenses/${pkgname}/"
+}
+
+
+pre_install() {
+  log "Iniciando instalação"
+}
+
+post_install() {
+  log "Finalizando instalação"
+}
+
+pre_upgrade() {
+  log "Iniciando upgrade"
+}
+
+post_upgrade() {
+  log "Finalizando upgrade"
+}
+
+
