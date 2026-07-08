@@ -1,7 +1,8 @@
 # Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
 
-pkgname=voidbr-google-chrome
-pkgver=149.0.7827.155
+pkgname=google-chrome
+replaces=(voidbr-google-chrome)
+pkgver=150.0.7871.100
 pkgrel=1
 pkgdesc="The popular web browser by Google (Stable Channel)"
 arch=('x86_64')
