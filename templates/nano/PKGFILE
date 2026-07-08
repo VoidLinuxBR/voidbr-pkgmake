@@ -2,7 +2,7 @@
 # Maintainer: Catafesta <vcatafesta@chililinux.com>
 
 pkgname=nano
-pkgver=8.7
+pkgver=9.1
 pkgrel=1
 pkgdesc="Pico editor clone with enhancements"
 license="GPL-3.0-or-later"
@@ -27,3 +27,21 @@ package() {
 	cd "${srcdir}/${pkgname}-${pkgver}"
    make DESTDIR="$pkgdir" install
 }
+
+pre_install() {
+  log "Iniciando instalação"
+}
+
+post_install() {
+  log "Finalizando instalação"
+}
+
+pre_upgrade() {
+  log "Iniciando upgrade"
+}
+
+post_upgrade() {
+  log "Finalizando upgrade"
+}
+
+
