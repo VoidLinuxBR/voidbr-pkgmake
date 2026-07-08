@@ -1,7 +1,7 @@
 # Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
 
 pkgname=prettier
-pkgver=3.7.3
+pkgver=3.8.1
 pkgrel=1
 pkgdesc='An opinionated code formatter'
 arch=(any)
@@ -51,3 +51,21 @@ package() {
   cd $pkgname
   cp -a dist/$pkgname/* "$pkgdir"/$mod_dir
 }
+
+
+pre_install() {
+  log "Iniciando instalação"
+}
+
+post_install() {
+  log "Finalizando instalação"
+}
+
+pre_upgrade() {
+  log "Iniciando upgrade"
+}
+
+post_upgrade() {
+  log "Finalizando upgrade"
+}
+
