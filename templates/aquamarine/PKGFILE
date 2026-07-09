@@ -1,35 +1,57 @@
-#!/usr/bin/env bash
-# NOTE: Imported from Arch PKGBUILD
-# NOTE: This PKGFILE is PARTIAL and MUST be reviewed
-
-# Maintainer: Caleb Maclennan <caleb@alerque.com>
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
 
 pkgname=aquamarine
-pkgver=0.11.0
-pkgrel=2
+pkgver=0.12.0
+pkgrel=1
 pkgdesc='a very light linux rendering backend library'
+replaces=()
+provides=()
 arch=(x86_64 aarch64)
 url="https://github.com/hyprwm/$pkgname"
 license=(BSD-3-Clause)
-depends=(libgcc
-         libstdc++
-         glibc # libc.so libm.so
-         hyprutils libhyprutils.so
-         hyprwayland-scanner
-         libdisplay-info libdisplay-info.so
-         libdrm # libdrm.so
-         libglvnd libEGL.so libGLESv2.so
-         libinput # libinput.so
-         mesa # libgbm.so
-         opengl-driver
-         pixman
-         pugixml
-         seatd libseat.so
-         systemd-libs libudev.so
-         wayland libwayland-client.so
-         wayland-protocols)
-makedepends=(cmake)
-provides=("lib$pkgname.so")
+depends=(
+#	libgcc
+#	libstdc++
+#	glibc
+#	hyprutils
+#	hyprwayland-scanner
+#	libdisplay-info
+#	libdrm
+#	libglvnd
+#	libEGL.so
+#	libGLESv2.so
+#	libinput
+#	mesa
+#	opengl-driver
+#	pixman
+#	pugixml
+#	seatd
+#	libseat.so
+#	systemd-libs
+#	libudev.so
+#	wayland
+#	libwayland-client.so
+#	wayland-protocols
+
+	libEGL
+	libglvnd
+	glibc
+	libdisplay-info
+	libdrm
+	libgbm
+	libgcc
+	hyprutils
+	libinput
+	libseat
+	libstdc++
+	eudev-libudev
+	wayland
+)
+makedepends=(
+	cmake
+	hyprwayland-scanner
+	hyprutils
+)
 _archive="$pkgname-$pkgver"
 source=("$url/archive/v$pkgver/$_archive.tar.gz")
 sha256sums=('d3c74babe4321a31fba0db2c8c27ea4436876c2617cf69f57c1813095b87ff9b')
@@ -47,3 +69,21 @@ package() {
 	DESTDIR="$pkgdir" cmake --install build
 	install -Dm0644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE
 }
+
+pre_install() {
+  log "Iniciando instalação"
+}
+
+post_install() {
+  log "Finalizando instalação"
+}
+
+pre_upgrade() {
+  log "Iniciando upgrade"
+}
+
+post_upgrade() {
+  log "Finalizando upgrade"
+}
+
+
