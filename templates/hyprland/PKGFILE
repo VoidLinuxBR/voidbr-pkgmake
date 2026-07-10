@@ -61,6 +61,8 @@ makedepends=(
 	glslang-devel
 	SPIRV-Tools-devel
 	aquamarine
+	re2-devel
+	muparser-devel
 )
 optdepends=('cmake: to build and install plugins using hyprpm'
 	'cpio: to build and install plugins using hyprpm'

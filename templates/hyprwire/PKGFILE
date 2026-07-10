@@ -1,0 +1,75 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=hyprwire
+pkgver=0.3.1
+pkgrel=2
+pkgdesc='A fast and consistent wire protocol for IPC'
+arch=(x86_64)
+url="https://github.com/hyprwm/$pkgname"
+license=(BSD-3-Clause)
+depends=(
+	libgcc
+	libstdc++
+	glibc
+	hyprutils
+	libffi
+	pugixml
+)
+makedepends=(cmake pugixml-devel hyprutils libffi)
+provides=()
+_archive="$pkgname-$pkgver"
+source=("$url/archive/v$pkgver/$_archive.tar.gz")
+sha256sums=('92a673d40ae6a7d66fbcd0a34ec071e026e17eaeeb0040c3375e4b2a80dba737')
+
+prepare() {
+	cd "$_archive"
+
+	# Compatibilidade com GCC 14/libstdc++:
+	# std::vector::append_range() ainda não está disponível. Injeta um
+	# helper compatível e substitui as chamadas no código-fonte.
+
+	find src -name '*.cpp' -exec sed -i '
+1i\
+#include <iterator>\
+template <class C, class R>\
+static inline void append_range(C& c, const R& r) {\
+    c.insert(c.end(), std::begin(r), std::end(r));\
+}\
+' {} +
+
+	find src -name '*.cpp' -exec sed -Ei \
+		's/([A-Za-z0-9_\.]+)\.append_range\((.*)\);/append_range(\1, \2);/g' {} +
+}
+
+build() {
+	cd "$_archive"
+	local cmake_options=(
+		-D CMAKE_BUILD_TYPE=None
+		-D CMAKE_INSTALL_PREFIX=/usr
+		-D CMAKE_INSTALL_LIBDIR=lib
+	)
+	cmake -B build -W no-dev ${cmake_options[@]}
+	cmake --build build
+}
+
+package() {
+	cd "$_archive"
+	DESTDIR="$pkgdir" cmake --install build
+	install -Dm0644 -t "$pkgdir/usr/share/licenses/$pkgname/" LICENSE
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+}
