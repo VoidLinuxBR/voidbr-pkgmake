@@ -1,0 +1,61 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=hyprgraphics
+pkgver=0.5.1
+pkgrel=3
+pkgdesc='hyprland graphics resources and utilities'
+arch=(x86_64 aarch64)
+url="https://github.com/hyprwm/$pkgname"
+license=(BSD-3-Clause)
+depends=(
+	cairo
+	file
+	libgcc
+	libstdc++
+	glibc
+	hyprutils
+	libjpeg-turbo
+	libjxl
+	libpng
+	librsvg
+	libwebp
+	libglvnd
+	pango
+	pixman
+)
+makedepends=(cmake file-devel libheif-devel libjxl-devel)
+provides=()
+_archive="$pkgname-$pkgver"
+source=("$url/archive/v$pkgver/$_archive.tar.gz")
+sha256sums=('861ecaad872835922dd5745a612d7a4cc7bfc4babb1d06bc92bc63c2ac013b74')
+
+build() {
+	cd "$_archive"
+	cmake -B build \
+		-D CMAKE_INSTALL_PREFIX=/usr \
+		-D CMAKE_INSTALL_LIBDIR=lib \
+		-D CMAKE_BUILD_TYPE=Release
+	cmake --build build
+}
+
+package() {
+	cd "$_archive"
+	DESTDIR="$pkgdir" cmake --install build
+	install -Dm0644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+}
