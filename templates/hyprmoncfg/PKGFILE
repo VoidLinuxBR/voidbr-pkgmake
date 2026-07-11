@@ -1,0 +1,76 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=hyprmoncfg
+pkgver=1.8.0
+pkgrel=1
+pkgdesc="Terminal-first monitor configurator and auto-switching daemon for Hyprland"
+arch=('x86_64')
+url="https://github.com/crmne/hyprmoncfg"
+license=('MIT')
+install="${pkgname}.install"
+depends=('hyprland')
+makedepends=(go)
+optdepends=('systemd: user service for automatic profile switching')
+conflicts=()
+options=('!debug' '!strip')
+source=("${url}/releases/download/v${pkgver}/hyprmoncfg_${pkgver}_linux_amd64.tar.gz")
+sha256sum=('48394e055d91b5de36efff128374a9b7132a9dc8378bbeef923e8ea38e2044a1')
+
+package() {
+	install -Dm755 "${srcdir}/hyprmoncfg" "${pkgdir}/usr/bin/hyprmoncfg"
+	install -Dm755 "${srcdir}/hyprmoncfgd" "${pkgdir}/usr/bin/hyprmoncfgd"
+	install -Dm644 "${srcdir}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+	install -Dm644 "${srcdir}/README.md" "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+	install -Dm644 "${srcdir}/packaging/applications/hyprmoncfg.desktop" "${pkgdir}/usr/share/applications/hyprmoncfg.desktop"
+	install -Dm644 "${srcdir}/packaging/icons/hyprmoncfg.svg" "${pkgdir}/usr/share/icons/hicolor/scalable/apps/hyprmoncfg.svg"
+	install -Dm644 "${srcdir}/packaging/systemd/hyprmoncfgd.service" "${pkgdir}/usr/lib/systemd/user/hyprmoncfgd.service"
+
+	install -d \
+		"${DESTDIR}/etc/sv/hyprmoncfgd" \
+		"${DESTDIR}/etc/sv/hyprmoncfgd/log"
+
+	cat >"${DESTDIR}/etc/sv/hyprmoncfgd/run" <<'EOF'
+#!/bin/sh
+exec 2>&1
+
+exec /usr/bin/hyprmoncfgd
+EOF
+
+	cat >"${DESTDIR}/etc/sv/hyprmoncfgd/log/run" <<'EOF'
+#!/bin/sh
+exec svlogd -tt /var/log/hyprmoncfgd
+EOF
+
+	chmod 755 \
+		"${DESTDIR}/etc/sv/hyprmoncfgd/run" \
+		"${DESTDIR}/etc/sv/hyprmoncfgd/log/run"
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	cat <<'EOF'
+Optional hyprmoncfg setup:
+
+  Launch the TUI:
+    hyprmoncfg
+
+  Enable the daemon:
+    vservice add hyprmoncfgd
+
+Profiles live in:
+  ~/.config/hyprmoncfg/profiles/
+EOF
+
+	log "Finalizando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+}
