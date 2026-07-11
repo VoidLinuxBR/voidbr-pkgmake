@@ -1,0 +1,51 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=hyprland-protocols
+pkgver=0.7.0
+pkgrel=1
+pkgdesc="Wayland protocol extensions for Hyprland"
+homepage="https://github.com/hyprwm/hyprland-protocols"
+license="BSD-3-Clause"
+source=("https://github.com/hyprwm/hyprland-protocols/archive/refs/tags/v${pkgver}.tar.gz")
+sha256sums=("ee419006d7cd20927b9b7c8b5fc430571c151b0385d600508de1a7957294498c")
+makedepends=(
+	meson
+	ninja
+	pkgconf
+	wayland-protocols
+)
+provides=()
+_archive="${pkgname}-$pkgver"
+
+build() {
+	cd "${srcdir}/$_archive"
+
+	meson setup build \
+		--prefix=/usr \
+		--libdir=lib \
+		--buildtype=release
+	meson compile -C build
+}
+
+package() {
+	cd "$_archive"
+	DESTDIR="$pkgdir" meson install -C build
+	install -Dm644 LICENSE \
+		"$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+}
