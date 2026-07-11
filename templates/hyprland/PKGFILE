@@ -132,11 +132,13 @@ build() {
 	cd "$_archive"
 
 	cmake -B build \
-		-DCMAKE_BUILD_TYPE=Release \
-		-DCMAKE_INSTALL_PREFIX=/usr \
-		-DCMAKE_INSTALL_LIBDIR=lib \
-		-DNO_SYSTEMD=ON \
-		-Dglaze_DIR=/usr/share/glaze
+		-D CMAKE_BUILD_TYPE=Release \
+		-D CMAKE_INSTALL_PREFIX=/usr \
+		-D CMAKE_INSTALL_LIBDIR=lib \
+		-D NO_SYSTEMD=ON \
+		-D NO_SYSTEMD:BOOL=true \
+		-D glaze_DIR:PATH=/usr/share/glaze \
+		-D glaze_DIR=/usr/share/glaze
 
 	cmake --build build
 }
