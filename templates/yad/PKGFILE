@@ -1,0 +1,64 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=yad
+pkgver=15.0
+pkgrel=1
+pkgdesc='A fork of zenity - display graphical dialogs from shell scripts or command line'
+url='https://github.com/v1cont/yad'
+arch=('x86_64')
+license=('GPL-3.0-or-later')
+depends=(
+  gtk+3
+  libwebkit2gtk41
+  gtksourceview
+  gspell
+	glibc
+	cairo
+	gdk-pixbuf
+	glib
+	pango
+)
+makedepends=('autoconf' 'automake')
+source=("https://github.com/v1cont/yad/releases/download/v${pkgver}/${pkgname}-${pkgver}.tar.xz")
+sha256sums=('7cf4dc136a643bf484ceab27d9b28a513624dffe38a08731132c0e4e24073772')
+
+prepare() {
+	cd "${srcdir}/${pkgname}-${pkgver}"
+
+	autoreconf -ivf
+}
+
+build() {
+	cd "${srcdir}/${pkgname}-${pkgver}"
+
+	./configure \
+		--prefix=/usr \
+		--enable-icon-browser \
+		--enable-html \
+		--enable-spell \
+		--enable-sourceview
+
+	make
+}
+
+package() {
+	cd "${srcdir}/${pkgname}-${pkgver}"
+
+	make DESTDIR="${pkgdir}" install
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+}

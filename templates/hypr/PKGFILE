@@ -1,0 +1,145 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=hyprland
+pkgver=0.55.4
+pkgrel=1
+pkgdesc='a highly customizable dynamic tiling Wayland compositor'
+arch=(x86_64 aarch64)
+url="https://github.com/hyprwm/${pkgname^}"
+license=(BSD-3-Clause)
+depends=(
+	cairo
+	aquamarine
+	libgcc
+	libstdc++
+	glibc
+	glib
+	glslang
+	hyprcursor
+	hyprgraphics
+	hyprland-guiutils
+	hyprlang
+	'hyprutils>=0.13'
+	hyprwayland-scanner
+	hyprwire
+	lcms2
+	libdrm
+	libglvnd
+	libinput
+	libX11
+	libxcb
+	libXcomposite
+	libXcursor
+	libXfixes
+	libxkbcommon
+	libXrender
+	lua
+	mesa
+	muparser
+#	opengl-driver
+	pango
+	pixman
+	re2
+	tomlplusplus
+	util-linux-libs
+	wayland
+	wayland-protocols
+	xcb-proto
+	xcb-util
+	xcb-util-errors
+	xcb-util-image
+	xcb-util-keysyms
+	xcb-util-renderutil
+	xcb-util-wm
+	xorg-server-xwayland
+)
+makedepends=(
+	cmake
+	cpio
+	glslang
+	hyprwayland-scanner
+	hyprwire
+	jq
+	pkgconf
+	python3
+	xxd
+	aquamarine
+	cairo-devel
+	glaze
+	glslang-devel
+	hwids
+	hyprcursor
+	hyprgraphics
+	hyprlang
+	'hyprutils>=0.13'
+	hyprwire
+	lcms2-devel
+	libdisplay-info-devel
+	libdrm-devel
+	libgbm-devel
+	libglvnd-devel
+	libinput-devel
+	libliftoff-devel
+	libseat-devel
+	libxcb-devel
+	libXcursor-devel
+	libxkbcommon-devel
+	lua55-devel
+	muparser-devel
+	pango-devel
+	re2-devel
+	udis86-devel
+	SPIRV-Tools-devel
+	tomlplusplus-devel
+	wayland-devel
+	wayland-protocols
+	xcb-util-errors-devel
+	xcb-util-renderutil-devel
+	xcb-util-wm-devel
+	xorg-server-xwayland
+	libinotify-tools
+)
+optdepends=('cmake: to build and install plugins using hyprpm'
+	'cpio: to build and install plugins using hyprpm'
+	'glaze: to build and install plugins using hyprpm'
+	'hyprland-protocols: to build and install plugins using hyprpm'
+	'hyprshutdown: clean logout and shutdown helper'
+	'meson: to build and install plugins using hyprpm'
+	'uwsm: an advanced way to start desktop compositors as systemd units'
+	'xdg-desktop-portal-hyprland: xdg-desktop-portal backend for hyprland')
+provides=()
+_archive="${pkgname}-source"
+#source=("$_archive.tar.gz::$url/releases/download/v$pkgver/source-v$pkgver.tar.gz")
+#source=("https://github.com/hyprwm/Hyprland/releases/download/v${pkgver}/source-v${pkgver}.tar.gz")
+sha256sums=('10cdda47e6a42e603a646ffda89c9fca0628c3a8211e2fbbee02f6282effe30b')
+
+package() {
+  local dirs=("usr" "etc" "opt")
+  #   echo "DESTDIR=$DESTDIR"
+  #   echo "pkgdir=$pkgdir"
+  #   echo "srcdir=$srcdir"
+  #   echo "_pkgsrc=$_pkgsrc"
+
+  cd $srcdir
+  for dir in "${dirs[@]}"; do
+    if [ -d "${dir}" ]; then
+      cp -a "${dir}" "$DESTDIR/"
+    fi
+  done
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+}

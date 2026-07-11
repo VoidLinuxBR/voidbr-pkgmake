@@ -19,7 +19,7 @@ depends=(
 	hyprgraphics
 	hyprland-guiutils
 	hyprlang
-	hyprutils
+	'hyprutils>=0.13'
 	hyprwayland-scanner
 	hyprwire
 	lcms2
@@ -71,7 +71,7 @@ makedepends=(
 	hyprcursor
 	hyprgraphics
 	hyprlang
-	hyprutils
+	'hyprutils>=0.13'
 	hyprwire
 	lcms2-devel
 	libdisplay-info-devel
@@ -89,7 +89,6 @@ makedepends=(
 	pango-devel
 	re2-devel
 	udis86-devel
-	libinotify-tools
 	SPIRV-Tools-devel
 	tomlplusplus-devel
 	wayland-devel
@@ -98,6 +97,7 @@ makedepends=(
 	xcb-util-renderutil-devel
 	xcb-util-wm-devel
 	xorg-server-xwayland
+	libinotify-tools
 )
 optdepends=('cmake: to build and install plugins using hyprpm'
 	'cpio: to build and install plugins using hyprpm'
@@ -108,7 +108,7 @@ optdepends=('cmake: to build and install plugins using hyprpm'
 	'uwsm: an advanced way to start desktop compositors as systemd units'
 	'xdg-desktop-portal-hyprland: xdg-desktop-portal backend for hyprland')
 provides=()
-_archive="${pkgname^}-$pkgver"
+_archive="${pkgname}-source"
 #source=("$_archive.tar.gz::$url/releases/download/v$pkgver/source-v$pkgver.tar.gz")
 source=("https://github.com/hyprwm/Hyprland/releases/download/v${pkgver}/source-v${pkgver}.tar.gz")
 sha256sums=('10cdda47e6a42e603a646ffda89c9fca0628c3a8211e2fbbee02f6282effe30b')

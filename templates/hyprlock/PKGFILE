@@ -1,0 +1,84 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=hyprlock
+pkgver=0.9.5
+pkgrel=4
+pkgdesc='hyprland’s GPU-accelerated screen locking utility'
+arch=(x86_64 aarch64)
+url="https://github.com/hyprwm/$pkgname"
+license=(BSD-3-Clause)
+depends=(
+	cairo
+	libgcc
+	libstdc++
+	glib
+	glibc
+	hyprgraphics
+	hyprlang
+	hyprutils
+	hyprwayland-scanner
+	libdrm
+	libglvnd
+	libxkbcommon
+	mesa
+	pam
+	pango
+	sdbus-c++
+	wayland
+	wayland-protocols
+)
+makedepends=(
+	cmake
+	hyprwayland-scanner
+	pkgconf
+	cairo-devel
+	elogind-devel
+	file-devel
+	hyprgraphics
+	hyprlang
+	hyprutils
+	libdrm-devel
+	libjpeg-turbo-devel
+	libwebp-devel
+	libxkbcommon-devel
+	MesaLib-devel
+	pam-devel
+	pango-devel
+	sdbus-c++
+	wayland-devel
+	wayland-protocols
+)
+backup=("etc/pam.d/$pkgname")
+_archive="$pkgname-$pkgver"
+source=("$url/archive/v$pkgver/$_archive.tar.gz")
+sha256sums=('cbc49fc5553c550131e1a15089847501de42579944814229bfa9f8ea18519f89')
+
+build() {
+	cd "$_archive"
+	cmake -B build \
+		-D CMAKE_INSTALL_PREFIX=/usr \
+		-D CMAKE_BUILD_TYPE=Release
+	cmake --build build
+}
+
+package() {
+	cd "$_archive"
+	DESTDIR="$pkgdir" cmake --install build
+	install -Dm0644 -t "$pkgdir/usr/share/licenses/$pkgname/" LICENSE
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+}

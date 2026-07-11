@@ -1,0 +1,73 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=hyprpicker
+pkgver=0.4.7
+pkgrel=3
+pkgdesc="A wlroots-compatible Wayland color picker that does not suck"
+arch=(x86_64)
+url="https://github.com/hyprwm/hyprpicker"
+license=(BSD-3-Clause)
+depends=(
+	cairo
+	glibc
+	hyprutils
+	hyprwayland-scanner
+	libgcc
+	libstdc++
+	libxkbcommon
+	wayland
+)
+makedepends=(
+	cmake
+	ninja
+  pkgconf
+  hyprwayland-scanner
+  wayland-protocols
+  wayland-devel
+  cairo-devel
+  pango-devel
+  libjpeg-turbo-devel
+  libglvnd-devel
+  hyprutils wlroots-devel
+  )
+optdepends=('wl-clipboard: Allows --autocopy to automatically copy the output to the clipboard')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('cde02b92abe372187c9d59a7cb2ca07ede5c3e1a8c81ed8b209dc0d3ac5f0339')
+
+
+prepare() {
+  make protocols
+}
+
+build() {
+	cd $pkgname-$pkgver
+	cmake -S . -B build \
+		-DCMAKE_BUILD_TYPE=None \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+    -D CMAKE_INSTALL_LIBDIR=lib \
+		-DCMAKE_INSTALL_MANDIR=/usr/share/man \
+		-Wno-dev
+	cmake --build build
+}
+
+package() {
+	cd "$pkgname-$pkgver"
+	DESTDIR="$pkgdir" cmake --install build
+	install -vDm644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+}
