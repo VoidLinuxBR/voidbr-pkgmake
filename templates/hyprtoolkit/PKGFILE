@@ -1,0 +1,92 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=hyprtoolkit
+pkgver=0.5.4
+pkgrel=2
+pkgdesc='A modern C++ Wayland-native GUI toolkit'
+arch=(x86_64)
+url="https://github.com/hyprwm/$pkgname"
+license=(BSD-3-Clause)
+depends=(
+	libgcc
+	libstdc++
+	aquamarine
+	cairo
+	glib
+	glibc
+	hyprgraphics
+	hyprlang
+	hyprutils
+	iniparser
+	libdrm
+	libglvnd
+	libxkbcommon
+	mesa
+	pango
+	pixman
+	wayland
+)
+makedepends=(
+  cmake
+  hyprwayland-scanner
+  pkgconf
+  aquamarine
+  cairo-devel
+  gtest-devel
+  hyprgraphics
+  hyprlang
+  hyprutils
+  iniparser-devel
+  libdrm-devel
+  libgbm-devel
+  libglvnd-devel
+  libxkbcommon-devel
+  pango-devel
+  pixman-devel
+  wayland-devel
+  wayland-protocols
+  )
+provides=()
+_archive="$pkgname-$pkgver"
+source=("$url/archive/v$pkgver/$_archive.tar.gz")
+sha256sums=('2fb59789f231c1c4e9154ceffc1e7524c0cae154807c0d57e6166806255b570f')
+
+prepare() {
+  cd "$_archive"
+
+  patch -Np1 -i ../../patches/fix-vector-format.patch
+}
+
+build() {
+	cd "$_archive"
+	local cmake_options=(
+		-D CMAKE_BUILD_TYPE=None
+		-D CMAKE_INSTALL_PREFIX=/usr
+    -D CMAKE_INSTALL_LIBDIR=lib
+    -D DISABLE_TESTS=ON
+	)
+	cmake -B build -W no-dev ${cmake_options[@]}
+	cmake --build build
+}
+
+package() {
+	cd "$_archive"
+	DESTDIR="$pkgdir" cmake --install build
+	install -Dm0644 -t "$pkgdir/usr/share/licenses/$pkgname/" LICENSE
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+}

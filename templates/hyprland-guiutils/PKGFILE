@@ -1,0 +1,70 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=hyprland-guiutils
+pkgver=0.2.1
+pkgrel=6
+pkgdesc='Hyprland GUI utilities'
+arch=(x86_64 aarch64)
+url="https://github.com/hyprwm/$pkgname"
+license=(BSD-3-Clause)
+depends=(
+	libgcc
+	libstdc++
+	glibc # libc.so libm.so
+	hyprlang
+	hyprtoolkit
+	hyprutils
+	libdrm
+	pixman
+)
+makedepends=(
+	ninja
+	pkgconf
+	cmake
+	aquamarine
+	cairo-devel
+	hyprgraphics
+	hyprlang
+	hyprtoolkit
+	hyprutils
+	libdrm-devel
+	pixman-devel
+	libxkbcommon-devel
+)
+replaces=()
+_archive="$pkgname-$pkgver"
+source=("$url/archive/v$pkgver/$_archive.tar.gz")
+sha256sums=('8de6ab7295dd120bab6b6b3e884b27b3c6ccc38ae345f3144bf9b5ad79251bcb')
+
+build() {
+	cd "$_archive"
+	local cmake_flags=(
+		-D CMAKE_BUILD_TYPE=Release
+		-D CMAKE_INSTALL_PREFIX=/usr
+		-D CMAKE_INSTALL_LIBDIR=lib
+	)
+	cmake -B build ${cmake_flags[@]}
+	cmake --build build
+}
+
+package() {
+	cd "$_archive"
+	DESTDIR="$pkgdir" cmake --install build
+	install -Dm0644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+}
