@@ -1,0 +1,66 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=visual-studio-code-bin
+_pkgname=visual-studio-code
+pkgver=1.128.0
+pkgrel=1
+pkgdesc="Visual Studio Code (vscode): Editor for building and debugging modern web and cloud applications (official binary version)"
+arch=('x86_64')
+url="https://code.visualstudio.com/"
+license=('custom: commercial')
+provides=()
+conflicts=()
+# Upstream has signature verification for extensions and stripping breaks it
+# See https://github.com/microsoft/vscode/issues/223455#issuecomment-2610001754
+options=(!strip)
+# lsof: needed for terminal splitting, see https://github.com/Microsoft/vscode/issues/62991
+# xdg-utils: needed for opening web links with xdg-open
+depends=(libxkbfile gnupg gtk3 libsecret nss gcc-libs libnotify libxss glibc lsof shared-mime-info xdg-utils alsa-lib)
+optdepends=('glib2: Needed for move to trash functionality'
+	'libdbusmenu-glib: Needed for KDE global menu'
+	'org.freedesktop.secrets: Needed for settings sync'
+	# See https://github.com/MicrosoftDocs/live-share/issues/4650
+	'icu69: Needed for live share')
+source=(${_pkgname}-bin.sh)
+source=(code_${pkgver}_amd64.deb::https://update.code.visualstudio.com/${pkgver}/linux-deb-x64/stable)
+sha256sums=('bd0d9edf69283ebdf4e73e0a7b168d2fcf50acbd01f63674cad93ed4fe42fdad')
+sha256sums=('ee7ff012cf872e497d665486e56c5b1a12e36cca0c07c97887c997cbfdc797b1')
+install=$pkgname.install
+
+package() {
+	bsdtar -xf data.tar.xz -C "${pkgdir}/"
+
+	install -d "${pkgdir}/usr/bin"
+	install -d "${pkgdir}/usr/share/licenses/${pkgname}"
+
+	ln -s /usr/share/code/resources/app/LICENSE.rtf \
+		"${pkgdir}/usr/share/licenses/${pkgname}/LICENSE.rtf"
+
+	# Launcher
+	install -m755 "${srcdir}/${_pkgname}-bin.sh" "${pkgdir}/usr/bin/code"
+
+	# Fix the desktop entries
+	sed -i \
+		-e 's/^\(Exec=\)[^ ]*/\1code/g' \
+		"${pkgdir}"/usr/share/applications/*.desktop
+
+	# setuid on chrome-sandbox
+	# Comment out if using a kernel without user namespaces, like linux-hardened
+	chmod u-s "${pkgdir}/usr/share/code/chrome-sandbox"
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+}
