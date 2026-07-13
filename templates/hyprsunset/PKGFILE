@@ -1,0 +1,61 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=hyprsunset
+pkgver=0.3.3
+pkgrel=7
+pkgdesc='An application to enable a blue-light filter on Hyprland'
+arch=(x86_64 aarch64)
+url="https://github.com/hyprwm/$pkgname"
+license=(BSD-3-Clause)
+depends=(
+  libgcc        # libgcc_s.so
+	libstdc++     # libstdc++.so
+	glibc         # libc.so libm.so
+	hyprlang      # libhyprlang.so
+	hyprutils     # libhyprutils.so
+	wayland       # libwayland-client.so
+)
+makedepends=(
+  cmake
+  pkgconf
+	hyprland-protocols
+	hyprwayland-scanner
+	wayland-protocols
+  hyprlang
+  hyprutils
+  wayland-devel
+)
+_archive="$pkgname-$pkgver"
+source=("$url/archive/v$pkgver/$_archive.tar.gz")
+sha256sums=('cf2b3cc836bdeb7ac3ae78cf98e8cc4a06093e8d8215ff4da2380843dcf1a5dc')
+
+build() {
+	cd "$_archive"
+	cmake -B build \
+		-D CMAKE_INSTALL_PREFIX=/usr \
+		-D CMAKE_BUILD_TYPE=Release
+		-D CMAKE_INSTALL_LIBDIR=lib
+	cmake --build build
+}
+
+package() {
+	cd "$_archive"
+	DESTDIR="$pkgdir" cmake --install build
+	install -Dm0644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+}
