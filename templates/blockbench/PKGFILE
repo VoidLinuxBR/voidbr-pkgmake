@@ -7,14 +7,7 @@ pkgdesc='A low-poly 3D model editor'
 arch=(x86_64)
 url='https://blockbench.net'
 license=(GPL-3.0-or-later)
-_electron=$(
-	compgen -c electron |
-		while read -r cmd; do
-			[[ $cmd =~ ^electron[0-9]+$ ]] && printf '%s\n' "$cmd"
-		done |
-		sort -V |
-		tail -n1
-)
+_electron=electron
 depends=(
 	"${_electron}"
 	bash
@@ -23,8 +16,9 @@ depends=(
 	libX11
 )
 makedepends=(
+  git
 	nodejs
-	git
+  electron
 )
 options=(!debug)
 source=(

@@ -1,9 +1,9 @@
 # Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
 
+pkgname=electron
 pkgver=35
 pkgrel=1
 epoch=1
-pkgname=electron
 pkgdesc='Meta package providing the latest available stable Electron build'
 arch=(any)
 url='https://electronjs.org'
@@ -12,8 +12,8 @@ depends=("electron$pkgver")
 
 package() {
   mkdir -p "$pkgdir/usr/bin" "$pkgdir/usr/lib"
-  ln -sf "${depends[0]}" "$pkgdir/usr/bin/$pkgname"
-  ln -sf "${depends[0]}" "$pkgdir/usr/lib/$pkgname"
+  ln -sf "${pkgname}${pkgver}" "$pkgdir/usr/bin/$pkgname"
+  ln -sf "${pkgname}${pkgver}" "$pkgdir/usr/lib/$pkgname"
 }
 
 pre_install() {
