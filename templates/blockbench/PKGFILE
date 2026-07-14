@@ -7,7 +7,7 @@ pkgdesc='A low-poly 3D model editor'
 arch=(x86_64)
 url='https://blockbench.net'
 license=(GPL-3.0-or-later)
-_electron=electron
+_electron=electron # Meta package providing the latest available stable Electron build
 depends=(
 	"${_electron}"
 	bash
