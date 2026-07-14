@@ -1,0 +1,87 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=blockbench
+pkgver=5.1.4
+pkgrel=1
+pkgdesc='A low-poly 3D model editor'
+arch=(x86_64)
+url='https://blockbench.net'
+license=(GPL-3.0-or-later)
+_electron=$(
+	compgen -c electron |
+		while read -r cmd; do
+			[[ $cmd =~ ^electron[0-9]+$ ]] && printf '%s\n' "$cmd"
+		done |
+		sort -V |
+		tail -n1
+)
+depends=(
+	"${_electron}"
+	bash
+	glibc
+	imlib2
+	libX11
+)
+makedepends=(
+	nodejs
+	git
+)
+options=(!debug)
+source=(
+	"${pkgname}::git+https://github.com/JannisX11/blockbench#tag=v${pkgver}"
+	"files/${pkgname}.desktop"
+	"files/${pkgname}.sh"
+)
+sha256sums=('54f2f7a0d6971780fcfea11a2589b6b7571326b4ee4cca3c568e26c37dada742'
+	'5a64727fcf696b3497190d441556322b4d0ffb70f560ba8eba6ef79ac5c36e8c')
+
+prepare() {
+	cd "${pkgname}"
+
+	npm install
+}
+
+build() {
+	cd "${pkgname}"
+
+	_electronDist=/usr/lib/${_electron}
+	_electronVersion=$(<"${_electronDist}/version")
+
+	npm run publish-linux -- --linux --x64 --dir
+}
+
+package() {
+	_electronDist=/usr/lib/${_electron}
+	_electronVersion=$(<"${_electronDist}/version")
+	_electronVersionMajor=${_electronVersion%%.*}
+	_electronDir=${_electronDist}${_electronVersionMajor}
+
+	install -d "${pkgdir}/usr/"{bin,share/{pixmaps,applications}}
+	install -d "${pkgdir}/${_electronDist}${_electronVersionMajor}/resources"
+
+	echo -e "#!/bin/bash\nexec ${_electron} ${_electronDist}${_electronVersionMajor}/resources/${pkgname}.asar \"\$@\"" >"${pkgdir}/usr/bin/${pkgname}"
+	chmod 755 "${pkgdir}/usr/bin/${pkgname}"
+
+	install "${WORKDIR}/files/${pkgname}.desktop" "${pkgdir}/usr/share/applications/${pkgname}.desktop"
+	install "${WORKDIR}/files/${pkgname}.sh" "${pkgdir}/usr/bin/${pkgname}.sh"
+
+	cd ${srcdir}
+	install "${pkgname}/icon.png" "${pkgdir}/usr/share/pixmaps/${pkgname}.png"
+	install "${pkgname}/dist-electron/linux-unpacked/resources/app.asar" "${pkgdir}${_electronDist}${_electronVersionMajor}/resources/${pkgname}.asar"
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+}

@@ -1,0 +1,33 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgver=35
+pkgrel=1
+epoch=1
+pkgname=electron
+pkgdesc='Meta package providing the latest available stable Electron build'
+arch=(any)
+url='https://electronjs.org'
+license=(MIT)
+depends=("electron$pkgver")
+
+package() {
+  mkdir -p "$pkgdir/usr/bin" "$pkgdir/usr/lib"
+  ln -sf "${depends[0]}" "$pkgdir/usr/bin/$pkgname"
+  ln -sf "${depends[0]}" "$pkgdir/usr/lib/$pkgname"
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+}

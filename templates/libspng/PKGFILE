@@ -1,0 +1,53 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=libspng
+pkgver=0.7.4
+pkgrel=1
+pkgdesc='Simple, modern libpng alternative'
+arch=(x86_64)
+url=https://github.com/randy408/libspng
+license=(BSD)
+depends=(
+	glibc
+	zlib
+)
+makedepends=(
+	git
+	meson
+	pkgconf
+	zlib-devel
+)
+provides=()
+source=("https://github.com/randy408/libspng/archive/refs/tags/v${pkgver}.tar.gz")
+checksum="47ec02be6c0a6323044600a9221b049f63e1953faf816903e7383d4dc4234487"
+
+build() {
+	cd "${srcdir}/${pkgname}-${pkgver}"
+
+	meson setup build \
+		-Dbuild_examples=false
+
+	meson compile -C build
+}
+
+package() {
+	cd "${srcdir}/${pkgname}-${pkgver}"
+	DESTDIR="${pkgdir}" meson install -C build
+	install -Dm 644 LICENSE -t "${pkgdir}"/usr/share/licenses/libspng/
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+}
