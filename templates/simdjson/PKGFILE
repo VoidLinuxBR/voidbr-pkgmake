@@ -1,0 +1,74 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=simdjson
+epoch=1
+pkgver=4.6.4
+pkgrel=1
+pkgdesc="A C++ library to see how fast we can parse JSON with complete validation."
+arch=('x86_64')
+url="https://github.com/simdjson/simdjson"
+license=('Apache-2.0')
+depends=(
+	libgcc
+	libstdc++
+)
+# This package should makedepend on cxxopts to build the tools, but that doesn't
+# work regardless so we skip it.
+makedepends=(
+	cmake
+)
+
+source=(
+	"$pkgname-$pkgver.tar.gz::https://github.com/simdjson/simdjson/archive/v$pkgver.tar.gz"
+)
+sha256sums=('b091107844fe928158c5c2265c20360fff312889ddf7ebc4528a0f0f8f2ff9cd')
+
+build() {
+	cmake -B build -S "$pkgname-$pkgver" \
+		-DBUILD_SHARED_LIBS='On' \
+		-DCMAKE_BUILD_TYPE='None' \
+		-DCMAKE_INSTALL_PREFIX='/usr' \
+		-DCPM_USE_LOCAL_PACKAGES='On' \
+		-DSIMDJSON_DEVELOPER_MODE='On' \
+		-DSIMDJSON_ALLOW_DOWNLOADS='Off' \
+		-Wno-dev
+
+	cmake --build build
+}
+
+check() {
+	local excluded_tests=""
+	local ctest_flags=(
+		--test-dir build
+		# show the stdout and stderr when the test fails
+		--output-on-failure
+		# execute tests in parallel
+		--parallel $(nproc)
+		# exclude problematic tests
+		--exclude-regex "$excluded_tests"
+	)
+
+	ctest "${ctest_flags[@]}"
+}
+
+package() {
+	DESTDIR="$pkgdir/" cmake --install build
+}
+
+# vim: tabstop=2 shiftwidth=2 expandtab:
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+}
