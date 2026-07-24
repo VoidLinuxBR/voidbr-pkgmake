@@ -25,21 +25,22 @@ depends=(
 	'zstd'
 )
 makedepends=(
-	'git'
-	'ninja'
-	'procps-ng'
-	'python'
-    ada-devel
-    brotli-devel
-    c-ares-devel
-    icu-devel
-    nghttp2-devel
-    nghttp3-devel
-    ngtcp2-devel
-    libuv-devel
-    openssl-devel
-    zlib-devel
-    pkg-config
+	pkg-config
+	git
+	ninja
+	procps-ng
+	python
+	ada-devel
+	brotli-devel
+	c-ares-devel
+	icu-devel
+	nghttp2-devel
+	nghttp3-devel
+	ngtcp2-devel
+	libuv-devel
+	openssl-devel
+	zlib-devel
+	simdjson
 )
 optdepends=('npm: nodejs package manager')
 provides=()

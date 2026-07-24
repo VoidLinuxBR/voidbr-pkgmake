@@ -273,7 +273,7 @@ from_venom() {
 			spkgbuild)
 				{
 					echo "#!/usr/bin/env bash"
-			    echo "# Maintainer: $PACKAGER"
+					echo "# Maintainer: $PACKAGER"
 					echo "# NOTE: Imported from Venom Linux"
 					echo "# NOTE: Source: https://github.com/venomlinux/ports/$repo/$pkg"
 					echo "# NOTE: This PKGFILE is PARTIAL and MUST be reviewed"
@@ -332,7 +332,7 @@ from_venom() {
                         }
                      }
                   ' "$f"
-  		    sh_pre_post_install
+					sh_pre_post_install
 				} >PKGFILE
 				;;
 			*)
@@ -341,7 +341,7 @@ from_venom() {
 			esac
 		done
 
-    shfmt -w PKGFILE
+		shfmt -w PKGFILE
 		msg "PKGFILE criado com sucesso."
 		msg "Entre no diretório com: cd ${DIRPKGFILE}"
 		msg "Revisão manual obrigatória."
@@ -534,7 +534,7 @@ from_arch() {
 	#chmod +x PKGFILE
 	#rm -f PKGBUILD
 
-  shfmt -w PKGFILE
+	shfmt -w PKGFILE
 	cmd_run popd >/dev/null || true
 	msg "${DESTDIR}/PKGFILE criado com sucesso."
 	msg "Entre no diretório: ${yellow}cd $DESTDIR${rst}"
@@ -956,6 +956,7 @@ fetch() {
 	fi
 
 	msg "Fetch source"
+
 	for src in "${source[@]}"; do
 		# alias::source
 		if [[ "$src" == *::* ]]; then
@@ -969,33 +970,58 @@ fetch() {
 		case "$s" in
 		git+*)
 			repo="${s#git+}"
-
 			tag=""
+
 			if [[ "$repo" == *#tag=* ]]; then
 				tag="${repo##*#tag=}"
+				tag="${tag%%\?*}"
 				repo="${repo%%#tag=*}"
 			fi
 
-			# se não tiver alias, usa basename
 			[[ -z "$cname" ]] && cname="$(basename "$repo" .git)"
 
 			if [[ -d "$cname/.git" ]]; then
 				msg "Usando repositório git existente: $cname"
+
+				cmd_run git -C "$cname" remote set-url origin "$repo"
+
+				if [[ -n "$tag" ]]; then
+					cmd_run git -C "$cname" fetch --depth=1 origin "refs/tags/$tag:refs/tags/$tag" ||
+						cmd_run git -C "$cname" fetch --tags
+
+					cmd_run git -C "$cname" checkout "$tag" ||
+						die "falha ao fazer checkout da tag $tag"
+				else
+					cmd_run git -C "$cname" pull --ff-only
+				fi
 			else
 				msg "Fetching: ${yellow}$s${rst}"
-				cmd_run git clone --recursive --depth=1 "$repo" "$cname" || die "falha ao clonar $repo"
-			fi
 
-			if [[ -n "$tag" ]]; then
-				cmd_run git -C "$cname" checkout "$tag" || die "falha ao fazer checkout do tag $tag"
+				if [[ -n "$tag" ]]; then
+					cmd_run git clone \
+						--recursive \
+						--branch "$tag" \
+						--depth=1 \
+						"$repo" "$cname" ||
+						die "falha ao clonar $repo ($tag)"
+				else
+					cmd_run git clone \
+						--recursive \
+						--depth=1 \
+						"$repo" "$cname" ||
+						die "falha ao clonar $repo"
+				fi
 			fi
 			;;
+
 		http://* | https://*)
 			f="${s##*/}"
+
 			if [[ -f "$f" ]]; then
 				msg "Source já existe, usando cache: $f"
 			else
 				msg "Fetching: ${yellow}$s${rst}"
+
 				if ! curl -fL --output "./$f" -- "$s"; then
 					case "$f" in
 					*.asc | *.sig)
@@ -1008,6 +1034,105 @@ fetch() {
 				fi
 			fi
 			;;
+
+		*)
+			[[ -f "$WORKDIR/$s" ]] || die "arquivo local não encontrado: $s"
+			cp -f "$WORKDIR/$s" .
+			;;
+		esac
+	done
+}
+
+fetchOLD() {
+	[[ -n "$SRCDIR" ]] || die "SRCDIR não definido"
+	mkdir -p "$SRCDIR"
+	cd "$SRCDIR" || die "falha ao entrar em $SRCDIR"
+
+	if ((IS_LOCAL_SOURCE)); then
+		msg "Pulando fetch (source local)"
+		return 0
+	fi
+
+	msg "Fetch source"
+
+	for src in "${source[@]}"; do
+		# alias::source
+		if [[ "$src" == *::* ]]; then
+			cname="${src%%::*}"
+			s="${src#*::}"
+		else
+			cname=""
+			s="$src"
+		fi
+
+		case "$s" in
+		git+*)
+			repo="${s#git+}"
+			tag=""
+
+			if [[ "$repo" == *#tag=* ]]; then
+				tag="${repo##*#tag=}"
+				tag="${tag%%\?*}"
+				repo="${repo%%#tag=*}"
+			fi
+
+			[[ -z "$cname" ]] && cname="$(basename "$repo" .git)"
+
+			if [[ -d "$cname/.git" ]]; then
+				msg "Usando repositório git existente: $cname"
+
+				cmd_run git -C "$cname" remote set-url origin "$repo"
+
+				if [[ -n "$tag" ]]; then
+					cmd_run git -C "$cname" fetch --depth=1 origin "refs/tags/$tag:refs/tags/$tag" ||
+						cmd_run git -C "$cname" fetch --tags
+
+					cmd_run git -C "$cname" checkout "$tag" ||
+						die "falha ao fazer checkout da tag $tag"
+				else
+					cmd_run git -C "$cname" pull --ff-only
+				fi
+			else
+				msg "Fetching: ${yellow}$s${rst}"
+
+				if [[ -n "$tag" ]]; then
+					cmd_run git clone \
+						--recursive \
+						--branch "$tag" \
+						--depth=1 \
+						"$repo" "$cname" ||
+						die "falha ao clonar $repo ($tag)"
+				else
+					cmd_run git clone \
+						--recursive \
+						--depth=1 \
+						"$repo" "$cname" ||
+						die "falha ao clonar $repo"
+				fi
+			fi
+			;;
+
+		http://* | https://*)
+			f="${s##*/}"
+
+			if [[ -f "$f" ]]; then
+				msg "Source já existe, usando cache: $f"
+			else
+				msg "Fetching: ${yellow}$s${rst}"
+
+				if ! curl -fL --output "./$f" -- "$s"; then
+					case "$f" in
+					*.asc | *.sig)
+						warn "assinatura não encontrada ($f), ignorando"
+						;;
+					*)
+						die "falha ao baixar source obrigatório: $f"
+						;;
+					esac
+				fi
+			fi
+			;;
+
 		*)
 			[[ -f "$WORKDIR/$s" ]] || die "arquivo local não encontrado: $s"
 			cp -f "$WORKDIR/$s" .
@@ -2102,7 +2227,7 @@ if $REINDEX_ALL; then
 fi
 
 if $REINDEX_ONLY; then
-#	REINDEX_FORCE=1
+	#	REINDEX_FORCE=1
 	REINDEX_FORCE=2
 	dedup_repo
 	create_repodata
