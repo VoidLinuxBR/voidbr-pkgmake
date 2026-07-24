@@ -83,8 +83,8 @@ CLI_PACKAGER=""
 
 REINDEX_FORCE="${REINDEX_FORCE:-0}"
 CLI_REINDEX=
-REINDEX_ONLY=0
-REINDEX_ALL=0
+REINDEX_ONLY=false
+REINDEX_ALL=false
 PRINTCONFIG=0
 IS_INSTALL_CREATED=false
 IS_REMOVE_CREATED=false
@@ -1640,6 +1640,17 @@ ${bold}Exemplos:${reset}
 
 create_repodata() {
 	case "$REINDEX_FORCE" in
+	0)
+		msg "Update repodata (incremental)"
+		#   cmd_run xbps-rindex -a "$PKGDEST"/*.xbps
+		cmd_run xbps-rindex -a "$PKGDEST/${PKGOUT}"
+		;;
+	2)
+		msg "Update repodata (incremental)"
+		#   cmd_run xbps-rindex -a "$PKGDEST"/*.xbps
+		shopt -s nullglob
+		cmd_run xbps-rindex -a $PKGDEST/*.xbps >/dev/null 2>&1
+		;;
 	1)
 		msg "Recreate repodata (hard reset)"
 
@@ -1658,11 +1669,6 @@ create_repodata() {
 
 		shopt -s nullglob
 		cmd_run xbps-rindex -a $PKGDEST/*.xbps
-		;;
-	0)
-		msg "Update repodata (incremental)"
-		#   cmd_run xbps-rindex -a "$PKGDEST"/*.xbps
-		cmd_run xbps-rindex -a "$PKGDEST/${PKGOUT}"
 		;;
 	*)
 		die "REINDEX_FORCE inválido (use 0 ou 1): $REINDEX_FORCE"
@@ -2020,11 +2026,11 @@ while [[ $# -gt 0 ]]; do
 		shift
 		;;
 	--reindex-only)
-		REINDEX_ONLY=1
+		REINDEX_ONLY=true
 		shift
 		;;
 	--reindex-all)
-		REINDEX_ALL=1
+		REINDEX_ALL=true
 		shift
 		;;
 	--privkey)
@@ -2086,8 +2092,8 @@ fi
 parse_config
 resolve_reindex
 
-if ((REINDEX_ALL)); then
-	REINDEX_FORCE=1
+if $REINDEX_ALL; then
+	REINDEX_FORCE=true
 	dedup_repo
 	SIGN_ONLY=1
 	sign_only
@@ -2095,8 +2101,10 @@ if ((REINDEX_ALL)); then
 	exit 0
 fi
 
-if ((REINDEX_ONLY)); then
-	REINDEX_FORCE=1
+if $REINDEX_ONLY; then
+#	REINDEX_FORCE=1
+	REINDEX_FORCE=2
+	dedup_repo
 	create_repodata
 	exit 0
 fi
