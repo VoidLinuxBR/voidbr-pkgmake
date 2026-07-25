@@ -410,6 +410,7 @@ from_voidlinuxbr() {
 	local REPO_URL="https://raw.githubusercontent.com/voidlinuxbr/pkgmake/main"
 	local TMP
 	TMP="$(mktemp -d)"
+	trap 'rm -rf -- "$TMP"' EXIT
 
 	msg "Importando template VoidLinuxBR: $PKGNAME"
 	msg "Fonte: https://github.com/voidlinuxbr/pkgmake"
@@ -541,52 +542,6 @@ from_arch() {
 }
 
 # -------------------------------------------------------------------
-# new --from-arch <pkgname>
-# Importa template oficial do Arch Linux
-# -------------------------------------------------------------------
-from_archOLD() {
-	local PKGNAME="$1"
-	local DIRPKGFILE="$2"
-
-	msg "Fetch PKGBUILD from Arch/AUR"
-	#	mkdir -p "${DIRPKGFILE}"
-	#  cd "${DIRPKGFILE}" || die "não foi possível entrar no diretório '${DIRPKGFILE} '"
-
-	#	TMP="$(mktemp -d)"
-	#	trap 'rm -rf "$TMP"' EXIT
-	#
-	#	if ! curl -fsSL \
-	#		"https://gitlab.archlinux.org/archlinux/packaging/packages/$PKGNAME/-/raw/main/PKGBUILD" \
-	#		-o "$TMP/PKGBUILD"; then
-	#		curl -fsSL \
-	#			"https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=$PKGNAME" \
-	#			-o "$TMP/PKGBUILD" || die "PKGBUILD não encontrado"
-	#	fi
-	#
-	cmd_run git clone --depth=1 https://gitlab.archlinux.org/archlinux/packaging/packages/"$PKGNAME" "arch-$PKGNAME" || die "Erro ao clonar"
-	cmd_run pushd "arch-$PKGNAME"
-	cmd_run find . -type f \( -name '*.toml' -o -name '.*.toml' \) -delete
-	cmd_run find . -name '.SRCINFO' -type f -delete
-	# -------------------------------------------------
-	# GERA PKGFILE (SEM MUTILAR source)
-	# -------------------------------------------------
-	{
-		echo "#!/usr/bin/env bash"
-		echo "# NOTE: Imported from Arch PKGBUILD"
-		echo "# NOTE: This PKGFILE is PARTIAL and MUST be reviewed"
-		echo
-		cat PKGBUILD
-	} >PKGFILE
-	cmd_run rm PKGBUILD || true
-	cmd_run popd
-
-	msg "PKGFILE criado com sucesso."
-	msg "Entre no diretório com: cd arch-$PKGNAME"
-	msg "Revisão manual obrigatória."
-	exit 0
-}
-
-# -------------------------------------------------------------------
 # new --from-void <pkgname>
 # Importa template oficial do Void Linux (void-packages)
 # -------------------------------------------------------------------
@@ -596,6 +551,7 @@ from_void() {
 	local VOID_REPO="https://raw.githubusercontent.com/void-linux/void-packages/master"
 	local TMP
 	TMP="$(mktemp -d)"
+	trap 'rm -rf -- "$TMP"' EXIT
 
 	[[ -z "$pkg" ]] && die "nome do pacote não informado"
 
@@ -761,7 +717,7 @@ die() {
 msg() { echo -e "${cyan}==> $*${reset}"; }
 warn() { echo -e "${yellow}==> aviso: $*${reset}" >&2; }
 msg_error() {
-	printf "${red}ERROR: %s\n" "$*" >&2
+	printf "${red}ERROR: %s${reset}\n" "$*" >&2
 	exit 1
 }
 
@@ -946,104 +902,6 @@ sync_deps() {
 }
 
 fetch() {
-	[[ -n "$SRCDIR" ]] || die "SRCDIR não definido"
-	mkdir -p "$SRCDIR"
-	cd "$SRCDIR" || die "falha ao entrar em $SRCDIR"
-
-	if ((IS_LOCAL_SOURCE)); then
-		msg "Pulando fetch (source local)"
-		return 0
-	fi
-
-	msg "Fetch source"
-
-	for src in "${source[@]}"; do
-		# alias::source
-		if [[ "$src" == *::* ]]; then
-			cname="${src%%::*}"
-			s="${src#*::}"
-		else
-			cname=""
-			s="$src"
-		fi
-
-		case "$s" in
-		git+*)
-			repo="${s#git+}"
-			tag=""
-
-			if [[ "$repo" == *#tag=* ]]; then
-				tag="${repo##*#tag=}"
-				tag="${tag%%\?*}"
-				repo="${repo%%#tag=*}"
-			fi
-
-			[[ -z "$cname" ]] && cname="$(basename "$repo" .git)"
-
-			if [[ -d "$cname/.git" ]]; then
-				msg "Usando repositório git existente: $cname"
-
-				cmd_run git -C "$cname" remote set-url origin "$repo"
-
-				if [[ -n "$tag" ]]; then
-					cmd_run git -C "$cname" fetch --depth=1 origin "refs/tags/$tag:refs/tags/$tag" ||
-						cmd_run git -C "$cname" fetch --tags
-
-					cmd_run git -C "$cname" checkout "$tag" ||
-						die "falha ao fazer checkout da tag $tag"
-				else
-					cmd_run git -C "$cname" pull --ff-only
-				fi
-			else
-				msg "Fetching: ${yellow}$s${rst}"
-
-				if [[ -n "$tag" ]]; then
-					cmd_run git clone \
-						--recursive \
-						--branch "$tag" \
-						--depth=1 \
-						"$repo" "$cname" ||
-						die "falha ao clonar $repo ($tag)"
-				else
-					cmd_run git clone \
-						--recursive \
-						--depth=1 \
-						"$repo" "$cname" ||
-						die "falha ao clonar $repo"
-				fi
-			fi
-			;;
-
-		http://* | https://*)
-			f="${s##*/}"
-
-			if [[ -f "$f" ]]; then
-				msg "Source já existe, usando cache: $f"
-			else
-				msg "Fetching: ${yellow}$s${rst}"
-
-				if ! curl -fL --output "./$f" -- "$s"; then
-					case "$f" in
-					*.asc | *.sig)
-						warn "assinatura não encontrada ($f), ignorando"
-						;;
-					*)
-						die "falha ao baixar source obrigatório: $f"
-						;;
-					esac
-				fi
-			fi
-			;;
-
-		*)
-			[[ -f "$WORKDIR/$s" ]] || die "arquivo local não encontrado: $s"
-			cp -f "$WORKDIR/$s" .
-			;;
-		esac
-	done
-}
-
-fetchOLD() {
 	[[ -n "$SRCDIR" ]] || die "SRCDIR não definido"
 	mkdir -p "$SRCDIR"
 	cd "$SRCDIR" || die "falha ao entrar em $SRCDIR"
@@ -1524,24 +1382,10 @@ run_all() {
 	deps_list="${depends[*]}"
 	provides_list="${provides[*]}"
 	replaces_list="${replaces[*]}"
+	license_list="${license[*]}"
 
 	INSTALL_OPTS=()
 	[[ -f "$WORKDIR/INSTALL" ]] && INSTALL_OPTS+=(-S "$WORKDIR/INSTALL")
-	deps_quoted=$(printf "'%s'" "$deps_list")
-	conf_quoted=$(printf "'%s'" "$conf_files_arg")
-	provides_quoted=$(printf "'%s'" "$provides_list")
-	replaces_quoted=$(printf "'%s'" "$replaces_list")
-
-	#	msg "Create XBPS $PKGOUT"
-	#	cmd_run xbps-create \
-	#		--architecture "$ARCH" \
-	#		--pkgver "${pkgname}-${pkgver}_${pkgrel}" \
-	#		--desc "$pkgdesc" \
-	#		--maintainer "$PACKAGER" \
-	#		--license "$license" \
-	#		--dependencies "$deps_list" \
-	#		--config-files "$conf_files_arg" \
-	#		"$pkgdir"
 
 	msg "Create XBPS $PKGOUT"
 	cmd_run xbps-create \
@@ -1549,7 +1393,7 @@ run_all() {
 		--pkgver "${pkgname}-${pkgver}_${pkgrel}" \
 		--desc "$pkgdesc" \
 		--maintainer "$PACKAGER" \
-		--license "$license" \
+		--license "$license_list" \
 		--dependencies "$deps_list" \
 		--provides "$provides_list" \
 		--replaces "$replaces_list" \
@@ -1705,7 +1549,7 @@ clean() {
 
 sh_version() {
 	cat <<-EOF
-		   ${BOLD}${CYAN}${0##*/} v${VERSION}${RESET}
+		   ${bold}${cyan}${APP} v${_VERSION_}${rst}
 		   ${APPDESC}
 		   ${bold}${orange}Copyright (c) 2019-2025, ${rst}ChiliLinux Development Team ${yellow}<https://chililinux.com> <https://github.com/chililimux>
 		   ${bold}${orange}Copyright (c) 2025-2025, ${rst}VoidLinuxBR Development Team ${yellow}<https://www.youtube.com/@voidlinuxbr <https://github.com/voidlinuxbr> <https://t.me/VoidLinuxBrasil>
@@ -1941,6 +1785,9 @@ resolve_pkgdest() {
 		die "PKGDEST não definido (use --pkgdest ou /etc/pkgmake.conf)"
 	fi
 
+	# BUGFIX: atualiza a global ANTES de validar, senão validate_pkgdest_sanity
+	# checa o valor antigo (ex.: vazio) em vez do valor recém-resolvido.
+	PKGDEST="$dest"
 	validate_pkgdest_sanity
 
 	# absolutiza
@@ -1967,9 +1814,10 @@ resolve_packager() {
 		die "PACKAGER não definido (use --packager ou /etc/pkgmake.conf)"
 	fi
 
-	validate_packager_sanity
-
+	# BUGFIX: atualiza a global ANTES de validar, senão validate_packager_sanity
+	# checa o valor antigo (ex.: vazio) em vez do --packager recém-passado.
 	PACKAGER="$packager"
+	validate_packager_sanity
 }
 
 resolve_signpkg() {
@@ -2098,7 +1946,7 @@ dedup_repo() {
 
 	msg "Iniciando deduplicação de pacotes no repositório local: $PKGDEST"
 	AllOldPackages=$(find "$PKGDEST" -type f -iname "*.$PKG_EXT" | sort -Vr | awk -F "$FETCH_RE" 'lista[$1]++')
-	for old in ${AllOldPackages[*]}; do
+	for old in $AllOldPackages; do
 		msg "${red}=>Removendo pacote antigo: [$((++count))] => $(basename "${old}") ${reset}"
 		msg "${red}=>Removendo pacote antigo: [$((count))] => $(basename "${old}.sig2") ${reset}"
 		rm -f "${old}" "${old}".sig2 >/dev/null 2>&-
@@ -2192,10 +2040,6 @@ while [[ $# -gt 0 ]]; do
 		CLI_PACKAGER="$2"
 		shift 2
 		;;
-	--packager)
-		CLI_PACKAGER="$2"
-		shift 2
-		;;
 	-h | --help)
 		usage
 		exit 0
@@ -2216,6 +2060,7 @@ fi
 
 parse_config
 resolve_reindex
+resolve_pkgdest # BUGFIX: garante PKGDEST válido também nos atalhos --sign-only/--reindex-only/--reindex-all
 
 if $REINDEX_ALL; then
 	REINDEX_FORCE=1
@@ -2242,7 +2087,7 @@ fi
 resolve_syncdeps
 resolve_signpkg
 resolve_verbose
-resolve_pkgdest # blindagem de path + permissão (ANTES de tudo)
+# resolve_pkgdest já foi chamado mais acima (antes dos atalhos --sign-only/--reindex-*)
 resolve_packager
 load_pkgfile
 sanitize_pkgfile_vars
