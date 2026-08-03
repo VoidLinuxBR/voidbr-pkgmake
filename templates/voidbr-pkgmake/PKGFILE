@@ -1,33 +1,31 @@
-#!/usr/bin/bash
 # Maintainer  : Vilmar Catafesta <vcatafesta@gmail.com>
 
-pkgname=pkgmake
-pkgdesc="makepkg-like tool for XBPS"
+pkgname=voidbr-pkgmake
+pkgdesc="Make pkg like tool for XBPS"
 pkgver=$(date +%Y%m%d)
 pkgrel=$(date +%H%M)
+provides=()
+replaces=()
+conflicts=()
 arch=('any')
-license=('GPL3')
+license=('MIT')
 url="https://github.com/voidlinuxbr/$pkgname"
-provides=("$pkgname")
 source=("git+${url}.git")
 md5sums=('SKIP')
 depends=(
-   bash
+	base-devel
+	bash
 	curl
 	git
 	xbps
 	xbps-triggers
 	coreutils
-   base-devel
+	ncurses
+	ncurses-devel
+	cmake
 )
-backup=( /etc/pkgmake.conf )
-
-# Automatically detect and use the correct install file
-if [ -e "${pkgname}.install" ]; then
-	install=${pkgname}.install
-elif [ -e "pkgbuild.install" ]; then
-	install=pkgbuild.install
-fi
+#conf_files=( /etc/pkgmake.conf /etc/vilmar.conf )
+backup=(/etc/pkgmake.conf)
 
 package() {
 	local dirs=("usr" "etc" "opt")
@@ -43,6 +41,22 @@ package() {
 		fi
 	done
 
-#	install -Dm644 etc/pkgmake.conf $DESTDIR/etc/pkgmake.conf.new-${pkgver}-${pkgrel}
+	#	install -Dm644 etc/pkgmake.conf $DESTDIR/etc/pkgmake.conf.new-${pkgver}-${pkgrel}
 	install -Dm644 etc/pkgmake.conf $DESTDIR/etc/pkgmake.conf.new
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
 }

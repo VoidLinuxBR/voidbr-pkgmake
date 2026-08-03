@@ -7,7 +7,9 @@ pkgrel=$(date +%H%M)
 arch=('any')
 license=('GPL3')
 url="https://github.com/chililinux/$pkgname"
-provides=("$pkgname")
+provides=()
+replaces=()
+conflicts=()
 source=("git+${url}.git")
 md5sums=('SKIP')
 depends=(sed dialog grep ncurses gawk coreutils util-linux pv which )
@@ -32,3 +34,20 @@ package() {
       fi
    done
 }
+
+pre_install() {
+  log "Iniciando instalação"
+}
+
+post_install() {
+  log "Finalizando instalação"
+}
+
+pre_upgrade() {
+  log "Iniciando upgrade"
+}
+
+post_upgrade() {
+  log "Finalizando upgrade"
+}
+
