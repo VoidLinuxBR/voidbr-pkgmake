@@ -379,6 +379,7 @@ homepage="https://homepage.com"
 depends=('bash>=0')
 provides=()
 replaces=()
+conflicts=()
 makedepends=()
 source=('https://homepage.com/file.tar.gz')
 backup=()
@@ -753,12 +754,17 @@ gen_key() {
 	msg "Chave gerada com sucesso: $HOME/.ssh/$KEY_FILE"
 }
 
+# get_repo_pkgver <nome-do-pacote> <repositorio-oficial>
+get_repo_pkgver() {
+  xbps-query -R -p pkgver "$1" 2>/dev/null
+}
+
 normalize_dep_patterns() {
 	local var
 	local i
 	local dep
 
-	for var in depends makedepends provides replaces; do
+	for var in depends makedepends provides replaces conflicts; do
 		declare -p "$var" &>/dev/null || continue
 		declare -n arr="$var"
 
@@ -771,10 +777,17 @@ normalize_dep_patterns() {
 			[[ "$dep" == "()" ]] && continue
 
 			case "$var" in
-			depends | replaces | provides)
-				# depends: se não tem operador, força >=0
+			depends | replaces | conflicts)
+				# se não tem operador, força >=0
 				if ! [[ "$dep" =~ [\<\>\=] ]]; then
 					arr[$i]="${dep}>=0"
+				fi
+				;;
+			provides)
+        # provides usa nome-versao (hifen+digito), nao operador
+        if ! [[ "$dep" =~ -[0-9] ]]; then
+				  ver_pkg=$(get_repo_pkgver "$dep")
+          arr[$i]="${ver_pkg}"
 				fi
 				;;
 			makedepends)
@@ -796,7 +809,7 @@ normalize_dep_patterns() {
 
 normalize_deps() {
 	local v
-	for v in depends makedepends provides replaces; do
+	for v in depends makedepends provides replaces conflicts; do
 		if declare -p "$v" &>/dev/null; then
 			# se não for array, converte string → array
 			if [[ "$(declare -p "$v")" != declare\ -a* ]]; then
@@ -1382,6 +1395,7 @@ run_all() {
 	deps_list="${depends[*]}"
 	provides_list="${provides[*]}"
 	replaces_list="${replaces[*]}"
+	conflicts_list="${conflicts[*]}"
 	license_list="${license[*]}"
 
 	INSTALL_OPTS=()
@@ -1397,6 +1411,7 @@ run_all() {
 		--dependencies "$deps_list" \
 		--provides "$provides_list" \
 		--replaces "$replaces_list" \
+		--conflicts "$conflicts_list" \
 		--config-files "$conf_files_arg" \
 		"$pkgdir"
 
@@ -1927,6 +1942,7 @@ sanitize_pkgfile_vars() {
 	declare -p depends &>/dev/null || depends=()
 	declare -p provides &>/dev/null || provides=()
 	declare -p replaces &>/dev/null || replaces=()
+	declare -p conflicts &>/dev/null || conflicts=()
 	declare -p makedepends &>/dev/null || makedepends=()
 	declare -p license &>/dev/null || license=()
 }
