@@ -52,22 +52,24 @@ prepare() {
 }
 
 build() {
-	cd ${srcdir}/${pkgbase}
+  cd ${srcdir}/${pkgbase}
 
-	# this uses malloc_usable_size, which is incompatible with fortification level 3
-	# https://github.com/koverstreet/bcachefs-tools/issues/237
-	export CFLAGS="${CFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
-	export CXXFLAGS="${CXXFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
+  # this uses malloc_usable_size, which is incompatible with fortification level 3
+  # https://github.com/koverstreet/bcachefs-tools/issues/237
+  export CFLAGS="${CFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
+  export CXXFLAGS="${CXXFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
 
-	make \
-		LIBEXECDIR=/usr/lib \
-		DESTDIR="${pkgdir}" \
-		ROOT_SBINDIR="/usr/bin" \
-		INITRAMFS_DIR="/usr/lib/initcpio/"
+  make \
+    LIBDIR="/usr/lib" \
+    LIBEXECDIR="/usr/lib" \
+    DESTDIR="${pkgdir}" \
+    ROOT_SBINDIR="/usr/bin" \
+    INITRAMFS_DIR="/usr/lib/initcpio/"
 }
 
+
 package() {
-	cd ${srcdir}/${pkgbase}
+  cd ${srcdir}/${pkgbase}
 
   # this uses malloc_usable_size, which is incompatible with fortification level 3
   # https://github.com/koverstreet/bcachefs-tools/issues/237
@@ -76,11 +78,18 @@ package() {
 
   make \
     PREFIX="/usr" \
-    LIBEXECDIR=/usr/lib \
+    LIBDIR="/usr/lib" \
+    LIBEXECDIR="/usr/lib" \
     DESTDIR="${pkgdir}" \
     ROOT_SBINDIR="/usr/bin" \
     INITRAMFS_DIR="/usr/lib/initcpio/" \
     install
+
+  # Garante que se o Makefile criar usr/lib64, o conteúdo seja movido para usr/lib
+  if [ -d "${pkgdir}/usr/lib64" ]; then
+    cp -a "${pkgdir}/usr/lib64/." "${pkgdir}/usr/lib/"
+    rm -rf "${pkgdir}/usr/lib64"
+  fi
 
   # replace incompatible initcpio hooks
   rm -rf "${pkgdir}"/usr/lib/initcpio/*
