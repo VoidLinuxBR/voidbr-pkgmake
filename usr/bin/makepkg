@@ -4,7 +4,7 @@
 #
 #  pkgmake — makepkg-like tool for Void XBPS
 #  Created: dom 21 dez 2025 11:47:51 -04
-#  Updated: qua 05 ago 2026 11:16:24 -04
+#  Updated: dom 09 ago 2026 19:22:01 -04
 #
 #  Copyright (c) 2019-2026, Vilmar Catafesta <vcatafesta@gmail.com>
 #  Assembled By Vilmar Catafesta for the ChiliLinux project.
@@ -45,7 +45,7 @@ set -o pipefail
 
 #system
 declare APP="${0##*/}"
-declare _VERSION_="1.08.05-20260805"
+declare _VERSION_="1.08.09-20260809"
 declare APPDESC="$APP - Wraper for xbps-create"
 declare distro="$(uname -n)"
 declare DEPENDENCIES=(tput)
@@ -1207,6 +1207,7 @@ sh_create_REMOVE() {
       echo '  IFS=: read -r user _ <<EOF'
       echo '$(getent passwd 1000)'
       echo 'EOF'
+      echo '[ -z $user ] && user=anon'
       echo 'fi'
       echo 'user_home=$(getent passwd "$user" | cut -d: -f6)'
       echo
@@ -1270,6 +1271,7 @@ sh_create_INSTALL() {
       echo '  IFS=: read -r user _ <<EOF'
       echo '$(getent passwd 1000)'
       echo 'EOF'
+      echo '[ -z $user ] && user=anon'
       echo 'fi'
       echo 'user_home=$(getent passwd "$user" | cut -d: -f6)'
 			echo
