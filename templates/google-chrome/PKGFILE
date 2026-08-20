@@ -1,10 +1,12 @@
 # Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
 
 pkgname=google-chrome
-replaces=(voidbr-google-chrome)
-pkgver=150.0.7871.100
+pkgver=151.0.7922.169
 pkgrel=1
 pkgdesc="The popular web browser by Google (Stable Channel)"
+provides=(voidbr-google-chrome)   # "eu SOU o $pkgname pkg1, pra quem depender deles"
+replaces=(voidbr-google-chrome)   # "remove o pkg1 pkg2 antigo automaticamente quando eu instalar"
+conflicts=(voidbr-google-chrome)  # "nunca me deixe coexistir com o pkg1 pkg2 original"
 arch=('x86_64')
 url="https://www.google.com/chrome"
 license=('custom:chrome')
@@ -51,20 +53,18 @@ package() {
 		"$pkgdir"/opt/google/chrome/product_logo_*.png
 }
 
-
 pre_install() {
-  log "Iniciando instalação"
+	log "Iniciando instalação"
 }
 
 post_install() {
-  log "Finalizando instalação"
+	log "Finalizando instalação"
 }
 
 pre_upgrade() {
-  log "Iniciando upgrade"
+	log "Iniciando upgrade"
 }
 
 post_upgrade() {
-  log "Finalizando upgrade"
+	log "Finalizando upgrade"
 }
-
