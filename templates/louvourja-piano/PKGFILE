@@ -1,0 +1,64 @@
+# Maintainer: Catafesta <catafesta@chililinux.com>
+
+pkgname=louvorja-piano
+pkgver=1.17.5
+pkgrel=1
+pkgdesc="LouvorJA - PIANO — aplicativo desktop para gerenciamento de culto"
+arch=('x86_64')
+url="https://github.com/pianolouvorja/app"
+license=('MIT')
+
+depends=(
+    'electron'
+)
+
+makedepends=(
+    'npm'
+    'nodejs'
+)
+
+source=(
+    "https://github.com/pianolouvorja/app/archive/refs/tags/v${pkgver}.tar.gz"
+)
+
+sha256sums=('SKIP')
+
+build() {
+    cd "$srcdir/app-$pkgver"
+
+    npm ci
+
+    ./node_modules/.bin/vite build --base=./
+}
+
+package() {
+    cd "$srcdir/app-$pkgver"
+
+    install -dm755 "$pkgdir/usr/lib/$pkgname"
+    install -dm755 "$pkgdir/usr/bin"
+    install -dm755 "$pkgdir/usr/share/applications"
+
+    cp -a dist electron public/ico "$pkgdir/usr/lib/$pkgname/"
+
+    install -Dm644 build/icon.png \
+        "$pkgdir/usr/share/icons/hicolor/256x256/apps/$pkgname.png"
+
+    cat > "$pkgdir/usr/share/applications/$pkgname.desktop" << EOF
+[Desktop Entry]
+Name=LouvorJA - PIANO
+Comment=Aplicativo desktop para gerenciamento de culto
+Exec=/usr/bin/$pkgname
+Icon=$pkgname
+Terminal=false
+Type=Application
+Categories=AudioVideo;
+StartupWMClass=louvorja-piano
+EOF
+
+    cat > "$pkgdir/usr/bin/$pkgname" << EOF
+#!/bin/sh
+exec electron /usr/lib/$pkgname/electron/main.mjs "\$@"
+EOF
+
+    chmod 755 "$pkgdir/usr/bin/$pkgname"
+}
