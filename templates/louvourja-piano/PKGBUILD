@@ -1,0 +1,151 @@
+# Maintainer: Catafesta <catafesta@chililinux.com>
+
+pkgname=louvorja-piano
+pkgver=1.17.5
+pkgrel=6
+pkgdesc="LouvorJA - PIANO - aplicativo desktop para gerenciamento de culto"
+arch=('x86_64')
+url="https://github.com/pianolouvorja/app"
+license=('MIT')
+
+depends=(
+	'electron'
+)
+
+makedepends=(
+	'nodejs'
+	'npm'
+)
+
+source=(
+	"https://github.com/pianolouvorja/app/archive/refs/tags/v${pkgver}.tar.gz"
+)
+
+sha256sums=('SKIP')
+
+build() {
+	cd "$srcdir/app-$pkgver"
+
+	npm ci --ignore-scripts
+
+	./node_modules/.bin/vite build --base=./
+}
+
+package() {
+	cd "$srcdir/app-$pkgver"
+
+	install -dm755 "$pkgdir/usr/lib/$pkgname"
+	install -dm755 "$pkgdir/usr/bin"
+	install -dm755 "$pkgdir/usr/share/applications"
+
+	# Frontend compilado
+	cp -a dist \
+		"$pkgdir/usr/lib/$pkgname/"
+
+	# Código principal do Electron
+	cp -a electron \
+		"$pkgdir/usr/lib/$pkgname/"
+
+	# EULA
+	install -Dm644 \
+		docs/LEGAL/eula/pt-BR.txt \
+		"$pkgdir/usr/lib/$pkgname/electron/docs/LEGAL/eula/pt-BR.txt"
+
+	# Dependências npm de runtime
+	install -dm755 "$pkgdir/usr/lib/$pkgname/node_modules"
+
+	while IFS= read -r -d '' item; do
+		cp -a "$item" \
+			"$pkgdir/usr/lib/$pkgname/node_modules/"
+	done < <(
+		find node_modules \
+			-mindepth 1 \
+			-maxdepth 1 \
+			! -name 'electron' \
+			! -name 'electron-builder' \
+			! -name 'vite' \
+			! -name 'vue-tsc' \
+			! -name 'typescript' \
+			! -name 'vitest' \
+			! -name 'concurrently' \
+			! -name 'cross-env' \
+			! -name 'npm-run-all2' \
+			! -name 'wait-on' \
+			! -name '@vitejs' \
+			! -name '@vue' \
+			! -name '@tailwindcss' \
+			! -name 'tailwindcss' \
+			! -name 'sass' \
+			! -name 'vite-plugin-electron' \
+			! -name 'vite-plugin-electron-renderer' \
+			! -name 'vite-plugin-vue-devtools' \
+			-print0
+	)
+
+	# Ícones da aplicação
+	if [ -d public/ico ]; then
+		cp -a public/ico \
+			"$pkgdir/usr/lib/$pkgname/"
+	fi
+
+	# Ícone principal
+	install -Dm644 \
+		build/icon.png \
+		"$pkgdir/usr/share/icons/hicolor/256x256/apps/$pkgname.png"
+
+	# Launcher
+	cat >"$pkgdir/usr/bin/$pkgname" <<EOF
+#!/bin/sh
+
+cd /usr/lib/$pkgname
+
+exec /usr/bin/electron \
+    --disable-gpu \
+    /usr/lib/$pkgname/electron/main.mjs "\$@"
+EOF
+
+	chmod 755 "$pkgdir/usr/bin/$pkgname"
+
+	# Desktop entry
+	cat >"$pkgdir/usr/share/applications/$pkgname.desktop" <<EOF
+[Desktop Entry]
+Name=LouvorJA - PIANO
+Comment=Aplicativo desktop para gerenciamento de culto
+Exec=/usr/bin/$pkgname
+Icon=$pkgname
+Terminal=false
+Type=Application
+Categories=AudioVideo;
+StartupWMClass=louvorja-piano
+EOF
+
+	# Licença
+	install -Dm644 \
+		LICENSE.md \
+		"$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
+
+post_install() {
+	log "Finalizando instalação"
+	local user
+
+	user="${SUDO_USER:-$(logname 2>/dev/null || true)}"
+
+	if [ -n "$user" ] && [ "$user" != "root" ]; then
+		rm -f "/home/$user/.local/share/applications/$pkgname.desktop"
+		update-desktop-database \
+			"/home/$user/.local/share/applications" 2>/dev/null || true
+	fi
+}
+
+post_upgrade() {
+	post_install
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
