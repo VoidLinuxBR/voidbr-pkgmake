@@ -2,8 +2,8 @@
 
 pkgname=louvorja-piano
 pkgver=1.17.5
-pkgrel=1
-pkgdesc="LouvorJA - PIANO — aplicativo desktop para gerenciamento de culto"
+pkgrel=3
+pkgdesc="LouvorJA - PIANO - aplicativo desktop para gerenciamento de culto"
 arch=('x86_64')
 url="https://github.com/pianolouvorja/app"
 license=('MIT')
@@ -13,8 +13,8 @@ depends=(
 )
 
 makedepends=(
-    'npm'
     'nodejs'
+    'npm'
 )
 
 source=(
@@ -26,7 +26,7 @@ sha256sums=('SKIP')
 build() {
     cd "$srcdir/app-$pkgver"
 
-    npm ci
+    npm ci --ignore-scripts
 
     ./node_modules/.bin/vite build --base=./
 }
@@ -38,11 +38,70 @@ package() {
     install -dm755 "$pkgdir/usr/bin"
     install -dm755 "$pkgdir/usr/share/applications"
 
-    cp -a dist electron public/ico "$pkgdir/usr/lib/$pkgname/"
+    # Frontend compilado
+    cp -a dist \
+        "$pkgdir/usr/lib/$pkgname/"
 
-    install -Dm644 build/icon.png \
+    # Código principal do Electron
+    cp -a electron \
+        "$pkgdir/usr/lib/$pkgname/"
+
+    # EULA
+    install -Dm644 \
+        docs/LEGAL/eula/pt-BR.txt \
+        "$pkgdir/usr/lib/$pkgname/electron/docs/LEGAL/eula/pt-BR.txt"
+
+    # Dependências npm de runtime
+    install -dm755 "$pkgdir/usr/lib/$pkgname/node_modules"
+
+    while IFS= read -r -d '' item; do
+        cp -a "$item" \
+            "$pkgdir/usr/lib/$pkgname/node_modules/"
+    done < <(
+        find node_modules \
+            -mindepth 1 \
+            -maxdepth 1 \
+            ! -name 'electron' \
+            ! -name 'electron-builder' \
+            ! -name 'vite' \
+            ! -name 'vue-tsc' \
+            ! -name 'typescript' \
+            ! -name 'vitest' \
+            ! -name 'concurrently' \
+            ! -name 'cross-env' \
+            ! -name 'npm-run-all2' \
+            ! -name 'wait-on' \
+            ! -name '@vitejs' \
+            ! -name '@vue' \
+            ! -name '@tailwindcss' \
+            ! -name 'tailwindcss' \
+            ! -name 'sass' \
+            ! -name 'vite-plugin-electron' \
+            ! -name 'vite-plugin-electron-renderer' \
+            ! -name 'vite-plugin-vue-devtools' \
+            -print0
+    )
+
+    # Ícones da aplicação
+    if [ -d public/ico ]; then
+        cp -a public/ico \
+            "$pkgdir/usr/lib/$pkgname/"
+    fi
+
+    install -Dm644 \
+        build/icon.png \
         "$pkgdir/usr/share/icons/hicolor/256x256/apps/$pkgname.png"
 
+    # Launcher
+    cat > "$pkgdir/usr/bin/$pkgname" << EOF
+#!/bin/sh
+cd /usr/lib/$pkgname
+exec /usr/bin/electron /usr/lib/$pkgname/electron/main.mjs "\$@"
+EOF
+
+    chmod 755 "$pkgdir/usr/bin/$pkgname"
+
+    # Desktop entry
     cat > "$pkgdir/usr/share/applications/$pkgname.desktop" << EOF
 [Desktop Entry]
 Name=LouvorJA - PIANO
@@ -53,12 +112,11 @@ Terminal=false
 Type=Application
 Categories=AudioVideo;
 StartupWMClass=louvorja-piano
+Path=/usr/lib/$pkgname
 EOF
 
-    cat > "$pkgdir/usr/bin/$pkgname" << EOF
-#!/bin/sh
-exec electron /usr/lib/$pkgname/electron/main.mjs "\$@"
-EOF
-
-    chmod 755 "$pkgdir/usr/bin/$pkgname"
+    # Licença
+    install -Dm644 \
+        LICENSE.md \
+        "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }
