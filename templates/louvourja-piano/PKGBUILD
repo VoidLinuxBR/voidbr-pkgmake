@@ -2,7 +2,7 @@
 
 pkgname=louvorja-piano
 pkgver=1.17.5
-pkgrel=6
+pkgrel=10
 pkgdesc="LouvorJA - PIANO - aplicativo desktop para gerenciamento de culto"
 arch=('x86_64')
 url="https://github.com/pianolouvorja/app"
@@ -26,6 +26,33 @@ sha256sums=('SKIP')
 build() {
 	cd "$srcdir/app-$pkgver"
 
+	# Pacote Linux nativo: impede que o aplicativo crie
+	# ~/.local/share/applications/louvorja-piano.desktop
+	# durante a execução.
+	python - <<'PY'
+from pathlib import Path
+
+p = Path("electron/app-icon.mjs")
+s = p.read_text()
+
+needle = """export function ensureLinuxTaskbarIntegration() {
+  if (process.platform !== 'linux') return
+"""
+
+replacement = """export function ensureLinuxTaskbarIntegration() {
+  if (process.platform !== 'linux') return
+  if (process.env.LOUVORJA_SYSTEM_PACKAGE === '1') return
+"""
+
+if needle not in s:
+    raise SystemExit(
+        "ensureLinuxTaskbarIntegration() não encontrado; "
+        "source incompatível com este PKGBUILD"
+    )
+
+p.write_text(s.replace(needle, replacement, 1))
+PY
+
 	npm ci --ignore-scripts
 
 	./node_modules/.bin/vite build --base=./
@@ -44,6 +71,10 @@ package() {
 
 	# Código principal do Electron
 	cp -a electron \
+		"$pkgdir/usr/lib/$pkgname/"
+
+	# Assets públicos usados pelo aplicativo
+	cp -a public/ico \
 		"$pkgdir/usr/lib/$pkgname/"
 
 	# EULA
@@ -82,20 +113,38 @@ package() {
 			-print0
 	)
 
-	# Ícones da aplicação
-	if [ -d public/ico ]; then
-		cp -a public/ico \
-			"$pkgdir/usr/lib/$pkgname/"
-	fi
-
-	# Ícone principal
+	# Ícones para o tema hicolor.
+	#
+	# Assets reais disponíveis em public/ico/.
 	install -Dm644 \
-		build/icon.png \
+		public/ico/favicon-16x16.png \
+		"$pkgdir/usr/share/icons/hicolor/16x16/apps/$pkgname.png"
+
+	install -Dm644 \
+		public/ico/favicon-32x32.png \
+		"$pkgdir/usr/share/icons/hicolor/32x32/apps/$pkgname.png"
+
+	install -Dm644 \
+		public/ico/icon-64.png \
+		"$pkgdir/usr/share/icons/hicolor/64x64/apps/$pkgname.png"
+
+	install -Dm644 \
+		public/ico/icon-128.png \
+		"$pkgdir/usr/share/icons/hicolor/128x128/apps/$pkgname.png"
+
+	install -Dm644 \
+		public/ico/icon-256.png \
 		"$pkgdir/usr/share/icons/hicolor/256x256/apps/$pkgname.png"
+
+	install -Dm644 \
+		public/ico/favicon-512x512.png \
+		"$pkgdir/usr/share/icons/hicolor/512x512/apps/$pkgname.png"
 
 	# Launcher
 	cat >"$pkgdir/usr/bin/$pkgname" <<EOF
 #!/bin/sh
+
+export LOUVORJA_SYSTEM_PACKAGE=1
 
 cd /usr/lib/$pkgname
 
@@ -107,7 +156,7 @@ EOF
 	chmod 755 "$pkgdir/usr/bin/$pkgname"
 
 	# Desktop entry
-	cat >"$pkgdir/usr/share/applications/$pkgname.desktop" <<EOF
+	cat >"$pkgdir/usr/share/applications/org.kde.$pkgname.desktop" <<EOF
 [Desktop Entry]
 Name=LouvorJA - PIANO
 Comment=Aplicativo desktop para gerenciamento de culto
@@ -115,8 +164,9 @@ Exec=/usr/bin/$pkgname
 Icon=$pkgname
 Terminal=false
 Type=Application
-Categories=AudioVideo;
+Categories=X-VoidBR-Apps;AudioVideo;Qt;KDE;AudioVideo;AudioVideoEditing;
 StartupWMClass=louvorja-piano
+StartupNotify=true
 EOF
 
 	# Licença
@@ -125,27 +175,19 @@ EOF
 		"$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }
 
-post_install() {
-	log "Finalizando instalação"
-	local user
-
-	user="${SUDO_USER:-$(logname 2>/dev/null || true)}"
-
-	if [ -n "$user" ] && [ "$user" != "root" ]; then
-		rm -f "/home/$user/.local/share/applications/$pkgname.desktop"
-		update-desktop-database \
-			"/home/$user/.local/share/applications" 2>/dev/null || true
-	fi
-}
-
-post_upgrade() {
-	post_install
-}
-
 pre_install() {
-	log "Iniciando instalação"
+  log "Iniciando instalação"
+}
+
+post_install() {
+  log "Finalizando instalação"
 }
 
 pre_upgrade() {
-	log "Iniciando upgrade"
+  log "Iniciando upgrade"
 }
+
+post_upgrade() {
+  log "Finalizando upgrade"
+}
+
