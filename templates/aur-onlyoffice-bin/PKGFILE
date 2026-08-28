@@ -1,0 +1,98 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=voidbr-onlyoffice-bin
+pkgver=9.4.0
+pkgrel=1
+pkgdesc='An office suite that combines text, spreadsheet and presentation editors'
+arch=('x86_64')
+url='https://www.onlyoffice.com/'
+license=('AGPL-3.0-only')
+depends=(
+	alsa-lib
+	at-spi2-core
+	cairo
+	curl
+	dbus
+	desktop-file-utils
+	expat
+	fontconfig
+	freetype
+	glib
+	glibc
+	gtk+3
+	gstreamer1
+	gst-plugins-base1
+	gst-plugins-ugly1
+	hicolor-icon-theme
+	libcups
+	libdrm
+	libgcc
+	libgllib
+	libnotify
+	libpulseaudio
+	libstdc++
+	libX11
+	libXcomposite
+	libXdamage
+	libxcb
+	libXext
+	libXfixes
+	libXi
+	libxkbcommon
+	libXrandr
+	# libxss
+	mesa
+	nss
+	nspr
+	pango
+	#sh
+	font-crosextra-carlito-ttf
+	dejavu-fonts-ttf
+	liberation-fonts-ttf
+)
+
+optdepends=(
+	gst-libav
+	gst-plugins-good
+	libreoffice
+	otf-takao
+	ttf-ms-fonts
+)
+provides=(onlyoffice-bin)
+conflicts=(onlyoffice)
+source=(
+	https://github.com/ONLYOFFICE/DesktopEditors/releases/download/v${pkgver}/onlyoffice-desktopeditors_amd64.deb
+	010-onlyoffice-bin-fix-document-opening.patch
+)
+sha256sums=(
+	4271434e81be42b1559fd989d24bf6d413482f278dc6a5e328202a4fc1a18649
+	670de5f8b72679a54ff41a96ba1bdba9231a93260d1a8eaf304f66c8e40efdb7
+)
+
+prepare() {
+	local pkgdeb="onlyoffice-desktopeditors_amd64.deb"
+	mkdir -p "onlyoffice-${pkgver}/pkg"
+	bsdtar -xf "${srcdir}/$pkgdeb" -C "onlyoffice-${pkgver}"
+	bsdtar -xf "onlyoffice-${pkgver}/data.tar.xz" -C "onlyoffice-${pkgver}/pkg"
+	patch -d "onlyoffice-${pkgver}/pkg" -Np1 -i "${srcdir}/010-onlyoffice-bin-fix-document-opening.patch"
+}
+
+package() {
+	cp -dr --no-preserve='ownership' "onlyoffice-${pkgver}"/pkg/* "$pkgdir"
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+}
