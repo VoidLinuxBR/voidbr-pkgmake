@@ -1,8 +1,8 @@
 # Maintainer: Catafesta <catafesta@chililinux.com>
 
 pkgname=louvorja-piano
-pkgver=1.17.5
-pkgrel=10
+pkgver=1.22.1
+pkgrel=1
 pkgdesc="LouvorJA - PIANO - aplicativo desktop para gerenciamento de culto"
 arch=('x86_64')
 url="https://github.com/pianolouvorja/app"

@@ -2,7 +2,7 @@
 
 pkgname=voidbr-onlyoffice-bin
 pkgver=9.4.0
-pkgrel=1
+pkgrel=2
 pkgdesc='An office suite that combines text, spreadsheet and presentation editors'
 arch=('x86_64')
 url='https://www.onlyoffice.com/'
@@ -27,7 +27,7 @@ depends=(
 	libcups
 	libdrm
 	libgcc
-	libgllib
+	giblib
 	libnotify
 	libpulseaudio
 	libstdc++
@@ -79,6 +79,7 @@ prepare() {
 
 package() {
 	cp -dr --no-preserve='ownership' "onlyoffice-${pkgver}"/pkg/* "$pkgdir"
+  cp -f ${WORKDIR}/onlyoffice-desktopeditors.desktop ${pkgdir}/usr/share/applications/
 }
 
 pre_install() {
