@@ -1,8 +1,8 @@
 # Maintainer: Catafesta <catafesta@chililinux.com>
 
 pkgname=louvorja-piano
-pkgver=1.22.1
-pkgrel=2
+pkgver=1.17.5
+pkgrel=10
 pkgdesc="LouvorJA - PIANO - aplicativo desktop para gerenciamento de culto"
 arch=('x86_64')
 url="https://github.com/pianolouvorja/app"
@@ -69,18 +69,18 @@ package() {
 	cp -a dist \
 		"$pkgdir/usr/lib/$pkgname/"
 
-	# Código principal do Electron.
-	# O EULA da v1.22.1 passou a estar em electron/legal/eula/.
-	# O eula.mjs procura esse caminho relativo a app.getAppPath().
-	# Portanto, não devemos mais instalar o EULA em docs/LEGAL/eula/.
-	# O cp abaixo preserva electron/legal/eula/ exatamente como vem
-	# no source.
+	# Código principal do Electron
 	cp -a electron \
 		"$pkgdir/usr/lib/$pkgname/"
 
 	# Assets públicos usados pelo aplicativo
 	cp -a public/ico \
 		"$pkgdir/usr/lib/$pkgname/"
+
+	# EULA
+	install -Dm644 \
+		docs/LEGAL/eula/pt-BR.txt \
+		"$pkgdir/usr/lib/$pkgname/electron/docs/LEGAL/eula/pt-BR.txt"
 
 	# Dependências npm de runtime
 	install -dm755 "$pkgdir/usr/lib/$pkgname/node_modules"
@@ -110,14 +110,12 @@ package() {
 			! -name 'vite-plugin-electron' \
 			! -name 'vite-plugin-electron-renderer' \
 			! -name 'vite-plugin-vue-devtools' \
-			! -name '@playwright' \
-			! -name '@stryker-mutator' \
-			! -name '@test-utils' \
-			! -name 'jsdom' \
 			-print0
 	)
 
-	# Ícones para o tema hicolor
+	# Ícones para o tema hicolor.
+	#
+	# Assets reais disponíveis em public/ico/.
 	install -Dm644 \
 		public/ico/favicon-16x16.png \
 		"$pkgdir/usr/share/icons/hicolor/16x16/apps/$pkgname.png"
@@ -146,25 +144,18 @@ package() {
 	cat >"$pkgdir/usr/bin/$pkgname" <<EOF
 #!/bin/sh
 
-# O upstream cria uma entrada .desktop em
-# ~/.local/share/applications durante o startup através de
-# ensureLinuxTaskbarIntegration(). Como este é um pacote nativo,
-# o .desktop correto já é instalado em /usr/share/applications.
-# Esta variável desativa somente essa integração específica.
 export LOUVORJA_SYSTEM_PACKAGE=1
 
 cd /usr/lib/$pkgname
 
 exec /usr/bin/electron \
-	--disable-gpu \
-	/usr/lib/$pkgname/electron/main.mjs "\$@"
+    --disable-gpu \
+    /usr/lib/$pkgname/electron/main.mjs "\$@"
 EOF
 
 	chmod 755 "$pkgdir/usr/bin/$pkgname"
 
-	# Desktop entry do pacote.
-	# O arquivo fica no diretório global do sistema, portanto o
-	# aplicativo não precisa criar uma cópia em ~/.local/share/applications.
+	# Desktop entry
 	cat >"$pkgdir/usr/share/applications/org.kde.$pkgname.desktop" <<EOF
 [Desktop Entry]
 Name=LouvorJA - PIANO
@@ -173,7 +164,7 @@ Exec=/usr/bin/$pkgname
 Icon=$pkgname
 Terminal=false
 Type=Application
-Categories=X-VoidBR-Apps;AudioVideo;Qt;KDE;AudioVideoEditing;
+Categories=X-VoidBR-Apps;AudioVideo;Qt;KDE;AudioVideo;AudioVideoEditing;
 StartupWMClass=louvorja-piano
 StartupNotify=true
 EOF
@@ -185,17 +176,18 @@ EOF
 }
 
 pre_install() {
-	log "Iniciando instalação"
+  log "Iniciando instalação"
 }
 
 post_install() {
-	log "Finalizando instalação"
+  log "Finalizando instalação"
 }
 
 pre_upgrade() {
-	log "Iniciando upgrade"
+  log "Iniciando upgrade"
 }
 
 post_upgrade() {
-	log "Finalizando upgrade"
+  log "Finalizando upgrade"
 }
+
