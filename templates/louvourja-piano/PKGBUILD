@@ -2,7 +2,7 @@
 
 pkgname=louvorja-piano
 pkgver=1.22.1
-pkgrel=2
+pkgrel=3
 pkgdesc="LouvorJA - PIANO - aplicativo desktop para gerenciamento de culto"
 arch=('x86_64')
 url="https://github.com/pianolouvorja/app"
@@ -26,9 +26,9 @@ sha256sums=('SKIP')
 build() {
 	cd "$srcdir/app-$pkgver"
 
-	# Pacote Linux nativo: impede que o aplicativo crie
-	# ~/.local/share/applications/louvorja-piano.desktop
-	# durante a execução.
+	# O upstream cria ~/.local/share/applications/louvorja-piano.desktop
+	# durante o startup. Em pacote nativo, usamos o .desktop instalado
+	# em /usr/share/applications e impedimos essa criação.
 	python - <<'PY'
 from pathlib import Path
 
@@ -65,16 +65,27 @@ package() {
 	install -dm755 "$pkgdir/usr/bin"
 	install -dm755 "$pkgdir/usr/share/applications"
 
+	# O package.json precisa ficar na raiz da aplicação.
+	# Na v1.22.1 ele declara:
+	#   "main": "electron/main.mjs"
+	#
+	# Isso é importante porque o Electron deve receber
+	# /usr/lib/louvorja-piano como appPath, e não
+	# /usr/lib/louvorja-piano/electron.
+	#
+	# Caso contrário, o eula.mjs acrescenta "electron/legal/eula"
+	# a um appPath que já termina em "electron", resultando em:
+	# /usr/lib/louvorja-piano/electron/electron/legal/eula/
+	install -Dm644 \
+		package.json \
+		"$pkgdir/usr/lib/$pkgname/package.json"
+
 	# Frontend compilado
 	cp -a dist \
 		"$pkgdir/usr/lib/$pkgname/"
 
 	# Código principal do Electron.
-	# O EULA da v1.22.1 passou a estar em electron/legal/eula/.
-	# O eula.mjs procura esse caminho relativo a app.getAppPath().
-	# Portanto, não devemos mais instalar o EULA em docs/LEGAL/eula/.
-	# O cp abaixo preserva electron/legal/eula/ exatamente como vem
-	# no source.
+	# Inclui electron/legal/eula/ da v1.22.1.
 	cp -a electron \
 		"$pkgdir/usr/lib/$pkgname/"
 
@@ -146,25 +157,27 @@ package() {
 	cat >"$pkgdir/usr/bin/$pkgname" <<EOF
 #!/bin/sh
 
-# O upstream cria uma entrada .desktop em
-# ~/.local/share/applications durante o startup através de
-# ensureLinuxTaskbarIntegration(). Como este é um pacote nativo,
-# o .desktop correto já é instalado em /usr/share/applications.
-# Esta variável desativa somente essa integração específica.
+# Impede o upstream de criar um .desktop em
+# ~/.local/share/applications durante o startup.
 export LOUVORJA_SYSTEM_PACKAGE=1
 
 cd /usr/lib/$pkgname
 
+# IMPORTANTE:
+# Inicia pela raiz da aplicação, não por electron/main.mjs.
+# Isso faz app.getAppPath() apontar para:
+# /usr/lib/louvorja-piano
+#
+# Assim o eula.mjs encontra:
+# /usr/lib/louvorja-piano/electron/legal/eula/
 exec /usr/bin/electron \
 	--disable-gpu \
-	/usr/lib/$pkgname/electron/main.mjs "\$@"
+	/usr/lib/$pkgname "\$@"
 EOF
 
 	chmod 755 "$pkgdir/usr/bin/$pkgname"
 
-	# Desktop entry do pacote.
-	# O arquivo fica no diretório global do sistema, portanto o
-	# aplicativo não precisa criar uma cópia em ~/.local/share/applications.
+	# Desktop entry global do pacote
 	cat >"$pkgdir/usr/share/applications/org.kde.$pkgname.desktop" <<EOF
 [Desktop Entry]
 Name=LouvorJA - PIANO
@@ -176,6 +189,7 @@ Type=Application
 Categories=X-VoidBR-Apps;AudioVideo;Qt;KDE;AudioVideoEditing;
 StartupWMClass=louvorja-piano
 StartupNotify=true
+MimeType=application/x-louvorja-liturgy;
 EOF
 
 	# Licença
