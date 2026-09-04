@@ -1,0 +1,5 @@
+#!/bin/sh
+# Cria o diretório de destino se não existir
+[ -d /var/log/samba-ad-dc ] || mkdir -p /var/log/samba-ad-dc
+# Executa o svlogd apontando para o diretório de logs
+exec svlogd -tt /var/log/samba-ad-dc

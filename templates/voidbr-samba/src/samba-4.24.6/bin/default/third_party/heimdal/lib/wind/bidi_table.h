@@ -1,0 +1,20 @@
+/* /github/voidbr/voidbr-pkgmake/templates/voidbr-samba/src/samba-4.24.6/bin/default/third_party/heimdal/lib/wind/bidi_table.h */
+/* Automatically generated at 2026-09-04T18:08:48.974853 */
+
+#ifndef BIDI_TABLE_H
+#define BIDI_TABLE_H 1
+
+#include <krb5-types.h>
+
+struct range_entry {
+  uint32_t start;
+  unsigned len;
+};
+
+extern const struct range_entry _wind_ral_table[];
+extern const struct range_entry _wind_l_table[];
+
+extern const size_t _wind_ral_table_size;
+extern const size_t _wind_l_table_size;
+
+#endif /* BIDI_TABLE_H */

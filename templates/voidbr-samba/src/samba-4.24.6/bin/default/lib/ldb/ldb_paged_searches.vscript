@@ -1,0 +1,8 @@
+SAMBA_4.24.6_PRIVATE_SAMBA {
+	global:
+		*;
+	local:
+		_end;
+		__bss_start;
+		_edata;
+};

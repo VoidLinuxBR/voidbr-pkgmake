@@ -1,0 +1,26 @@
+#!/bin/sh
+
+# 1. Preparação da estrutura exigida pelo binário em /opt
+mkdir -p /opt/samba/var/locks/winbindd_privileged
+mkdir -p /opt/samba/var/lib/ntp_signd
+mkdir -p /opt/samba/var/run
+mkdir -p /run/samba
+
+# 2. Ajuste de permissões para garantir a criação dos sockets/pipes
+chown -R root:root /opt/samba/var/locks/winbindd_privileged
+chmod 750 /opt/samba/var/locks/winbindd_privileged
+
+chown -R root:root /opt/samba/var/lib/ntp_signd
+chmod 750 /opt/samba/var/lib/ntp_signd
+
+# 3. Link simbólico para compatibilidade com ferramentas do sistema (wbinfo)
+if [ ! -L /var/lib/samba/winbindd_privileged ]; then
+    mkdir -p /var/lib/samba
+    ln -sf /opt/samba/var/locks/winbindd_privileged /var/lib/samba/winbindd_privileged
+fi
+
+# 4. Execução do Samba conforme sua especificação
+# -i: modo interativo
+# -M single: modelo de processo único
+# --debuglevel=3: logs detalhados
+exec /opt/samba/sbin/samba -i -M single --debuglevel=3 2>&1

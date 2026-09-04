@@ -1,0 +1,1 @@
+/github/voidbr/voidbr-pkgmake/templates/voidbr-samba/src/samba-4.24.6/python/samba/netcmd/service_account/group_msa_membership.py
