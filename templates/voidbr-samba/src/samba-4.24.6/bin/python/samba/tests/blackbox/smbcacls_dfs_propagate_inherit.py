@@ -1,1 +1,0 @@
-/github/voidbr/voidbr-pkgmake/templates/voidbr-samba/src/samba-4.24.6/python/samba/tests/blackbox/smbcacls_dfs_propagate_inherit.py

@@ -1,2 +1,0 @@
-/github/voidbr/voidbr-pkgmake/templates/voidbr-samba/src/samba-4.24.6/bin/default/lib/util/tini.c.4.o: \
- ../../lib/util/tini.c ../../lib/util/tini.h

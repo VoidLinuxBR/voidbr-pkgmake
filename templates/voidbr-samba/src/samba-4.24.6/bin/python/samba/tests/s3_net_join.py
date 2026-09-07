@@ -1,1 +1,0 @@
-/github/voidbr/voidbr-pkgmake/templates/voidbr-samba/src/samba-4.24.6/python/samba/tests/s3_net_join.py

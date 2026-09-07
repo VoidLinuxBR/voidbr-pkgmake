@@ -1,1 +1,0 @@
-/github/voidbr/voidbr-pkgmake/templates/voidbr-samba/src/samba-4.24.6/lib/tdb/_tdb_text.py

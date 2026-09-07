@@ -1,1 +1,0 @@
-/github/voidbr/voidbr-pkgmake/templates/voidbr-samba/src/samba-4.24.6/python/samba/gp/gp_cert_auto_enroll_ext.py

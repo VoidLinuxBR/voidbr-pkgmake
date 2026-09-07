@@ -1,1 +1,0 @@
-/github/voidbr/voidbr-pkgmake/templates/voidbr-samba/src/samba-4.24.6/python/samba/tests/tpm20_rsakey_blob.py

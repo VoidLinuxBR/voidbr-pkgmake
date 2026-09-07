@@ -1,1 +1,0 @@
-/github/voidbr/voidbr-pkgmake/templates/voidbr-samba/src/samba-4.24.6/python/samba/tests/samba_tool/user_get_kerberos_ticket.py
