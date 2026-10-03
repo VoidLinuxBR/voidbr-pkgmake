@@ -1,0 +1,78 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=umbriel
+pkgver=0.1.0git20261001
+pkgrel=1
+pkgdesc="Wayland compositor built on wlroots"
+homepage="https://github.com/noctalia-dev/umbriel"
+license="MIT"
+depends=(
+    xwayland-satellite
+)
+makedepends=(
+ git
+ meson
+ pkg-config
+ wayland-devel
+ wayland-protocols
+ wlroots0.20-devel
+ libxkbcommon-devel
+ libinput-devel
+ pixman-devel
+ libdrm-devel
+ cairo-devel
+ pango-devel
+ tomlplusplus-devel
+ json-c++
+ eudev-libudev-devel
+ MesaLib-devel
+ libglvnd-devel
+ jemalloc-devel
+ libxcb-devel
+ xcb-util-wm-devel
+)
+
+source=(
+	"git+https://github.com/noctalia-dev/umbriel.git"
+)
+
+md5sums=(
+	"SKIP"
+)
+
+build() {
+	cd "${srcdir}/umbriel"
+
+	meson setup build \
+		--prefix=/usr \
+		--buildtype=release \
+		-Dtests=disabled \
+		-Djemalloc=auto
+
+	meson compile -C build
+}
+
+package() {
+	cd "${srcdir}/umbriel"
+
+	DESTDIR="${pkgdir}" meson install -C build
+
+	install -Dm644 LICENSE \
+		"${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}
+
+pre_install() {
+  log "Iniciando instalação"
+}
+
+post_install() {
+  log "Finalizando instalação"
+}
+
+pre_upgrade() {
+  log "Iniciando upgrade"
+}
+
+post_upgrade() {
+  log "Finalizando upgrade"
+}
