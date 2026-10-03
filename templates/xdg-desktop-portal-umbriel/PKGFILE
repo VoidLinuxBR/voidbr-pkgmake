@@ -1,0 +1,91 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=xdg-desktop-portal-umbriel
+pkgdesc="XDG Desktop Portal backend for Umbriel"
+pkgver=0.1.0
+pkgrel=1
+provides=()
+replaces=()
+conflicts=()
+arch=('x86_64')
+license=('MIT')
+url="https://github.com/noctalia-dev/${pkgname}"
+source=("git+${url}.git")
+md5sums=('SKIP')
+
+makedepends=(
+	'meson'
+	'ninja'
+	'pkgconf'
+	'wayland-protocols'
+	'wayland'
+	'wayland-scanner'
+	'sdbus-c++'
+	'pipewire'
+	'libdrm'
+	'mesa'
+	'cairo'
+	'tomlplusplus'
+	'nlohmann-json'
+)
+
+depends=(
+	'wayland'
+	'pipewire'
+	'libdrm'
+	'mesa'
+	'cairo'
+	'sdbus-c++'
+)
+
+backup=()
+
+if [ -e "${pkgname}.install" ]; then
+	install=${pkgname}.install
+elif [ -e "pkgbuild.install" ]; then
+	install=pkgfile.install
+fi
+
+build() {
+	cd "${srcdir}/${pkgname}"
+
+	meson setup build \
+		--prefix=/usr \
+		--libexecdir=/usr/libexec \
+		--buildtype=release \
+		-Dpicker=disabled
+
+	meson compile -C build
+}
+
+package() {
+	cd "${srcdir}/${pkgname}"
+
+	DESTDIR="${pkgdir}" meson install -C build
+
+	if [ -f "LICENSE" ]; then
+		install -Dm644 LICENSE \
+			"${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+	fi
+
+	if [ -f "README.md" ]; then
+		install -Dm644 README.md \
+			"${pkgdir}/usr/share/doc/${pkgname}/README.md"
+	fi
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+}
