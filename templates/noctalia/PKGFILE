@@ -1,63 +1,73 @@
+#!/usr/bin/env bash
+# NOTE: Imported from Arch Linux/AUR
 # Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+# Maintainer: Peter Jung <ptr1337@archlinux.org>
+# Maintainer: Noctalia Team <team@noctalia.dev>
 
-pkgname=noctalia
 _pkgname=noctalia
-pkgver=5.0.0.r1191.g39a4a335c
-pkgrel=12
-pkgdesc='Lightweight Wayland shell built directly on Wayland and OpenGL ES'
-arch=('x86_64')
+pkgname=noctalia
+pkgver=5.2.1
+pkgrel=1
+pkgdesc='A sleek, customizable desktop shell crafted for Wayland'
+arch=('x86_64' 'aarch64')
 url='https://github.com/noctalia-dev/noctalia'
 license=('MIT')
-options=('!debug')
 depends=(
+	'bash'
 	'cairo'
 	'curl'
 	'fontconfig'
 	'freetype'
-	'libgcc'
+	'git'
 	'glib'
 	'glibc'
+	'harfbuzz'
+	'hicolor-icon-theme'
 	'jemalloc'
+	'libgcc'
 	'libglvnd'
+	'libical'
+	'libjxl'
 	'libpipewire'
 	'libqalculate'
 	'librsvg'
+	'libsecret'
+	'libsndfile'
+	'libsodium'
+	'libstdc++'
 	'libwebp'
+	'wireplumber'
 	'libxkbcommon'
 	'libxml2'
+	'md4c'
 	'pam'
 	'polkit'
 	'pango'
 	'sdbus-c++'
+	'tomlplusplus'
 	'wayland'
 )
 
+optdepends=(
+	'ddcutil: monitor brightness control'
+	'power-profiles-daemon: power profile management'
+	'upower: battery and power device integration'
+)
+
 makedepends=(
-	'git'
 	'meson'
 	'ninja'
+	'nlohmann-json'
 	'pkgconf'
+	'stb'
 	'wayland-protocols'
-	sdbus-c++-devel
-	libcurl-devel
-	libqalculate-devel
 )
-provides=()
-conflicts=()
-source=("${_pkgname}::git+${url}.git")
-sha256sums=('SKIP')
-
-pkgver() {
-	cd "${_pkgname}"
-
-	local version
-	version="$(sed -n "s/^  version: '\([^']*\)',/\1/p" meson.build)"
-	printf '%s.r%s.g%s' "${version}" "$(git rev-list --count HEAD)" "$(git rev-parse --short=9 HEAD)"
-}
+source=("${_pkgname}-${pkgver}.tar.gz::${url}/archive/refs/tags/v${pkgver//_/-}.tar.gz")
+sha256sums=('5418f6b759de96e56a4bbca809c5a4c60a8a9594bdf67ecb8c5a341f97c221d1')
 
 build() {
 	CXXFLAGS+=" -Wno-unused-result"
-	meson "${_pkgname}" build-release \
+	meson "${_pkgname}-${pkgver//_/-}" build-release \
 		-Db_ndebug=true \
 		-Dtests=disabled
 	meson compile -C build-release
@@ -65,22 +75,23 @@ build() {
 
 package() {
 	meson install -C build-release --destdir "${pkgdir}"
-	install -Dm644 "${_pkgname}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
-	install -Dm644 "${_pkgname}/README.md" "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+
+	install -Dm644 "${_pkgname}-${pkgver//_/-}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+	install -Dm644 "${_pkgname}-${pkgver//_/-}/README.md" "${pkgdir}/usr/share/doc/${pkgname}/README.md"
 }
 
 pre_install() {
-  log "Iniciando instalação"
+	log "Iniciando instalação"
 }
 
 post_install() {
-  log "Finalizando instalação"
+	log "Finalizando instalação"
 }
 
 pre_upgrade() {
-  log "Iniciando upgrade"
+	log "Iniciando upgrade"
 }
 
 post_upgrade() {
-  log "Finalizando upgrade"
+	log "Finalizando upgrade"
 }

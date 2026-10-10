@@ -2,8 +2,8 @@
 
 pkgname=noctalia-greeter
 _pkgname=noctalia-greeter
-pkgver=1.0.0.r32.g34599488c
-pkgrel=3
+pkgver=1.6.0
+pkgrel=1
 pkgdesc="Greetd greeter for Noctalia"
 arch=('x86_64')
 url="https://github.com/noctalia-dev/noctalia-greeter"
@@ -66,15 +66,15 @@ package() {
 }
 
 post_install() {
-	if [[ ! -x /usr/bin/noctalia-greeter-apply-appearance ]]; then
+	if [[ ! -x /usr/local/bin/noctalia-greeter-apply-appearance ]]; then
 		return 0
 	fi
 
-	NOCTALIA_GREETER_SESSION_BIN=/usr/bin/noctalia-greeter-session \
+	NOCTALIA_GREETER_SESSION_BIN=/usr/local/bin/noctalia-greeter-session \
 		/usr/share/noctalia-greeter/setup_greeter_system.sh || true
 
 	echo ""
-	echo "==> greetd should use: command = \"/usr/bin/noctalia-greeter-session\""
+	echo "==> greetd should use: command = \"/usr/local/bin/noctalia-greeter-session\""
 	echo "==> Full config block: sudo noctalia-greeter-print-greetd-config"
 	echo ""
 }
