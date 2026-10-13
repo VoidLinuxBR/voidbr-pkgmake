@@ -1,0 +1,42 @@
+pkgname=bibata-modern-ice
+pkgdesc="Open source, compact, and material designed cursor theme"
+pkgver=2.0.7
+pkgrel=1
+provides=()
+replaces=()
+arch=('any')
+license=('GPL-3.0-or-later')
+url="https://github.com/ful1e5/Bibata_Cursor"
+source=("https://github.com/ful1e5/Bibata_Cursor/releases/download/v${pkgver}/Bibata-Modern-Ice.tar.xz")
+md5sums=('SKIP')
+sha256sums=('a68cae60c4dc706350e194ebc91c5fe48bc7bc9d59e119555834a2a7ee5078ef')
+makedepends=()
+depends=()
+
+package() {
+	# Cria a pasta do tema dentro do pacote (/usr/share/icons/Bibata-Modern-Ice)
+	install -dm755 "${pkgdir}/usr/share/icons/Bibata-Modern-Ice"
+
+	# O pkgmake extrai tudo no ${srcdir}. Como esse tarball não tem uma pasta raiz própria,
+	# nós copiamos os arquivos extraídos com segurança.
+	cp -a "${srcdir}/Bibata-Modern-Ice/cursors" "${pkgdir}/usr/share/icons/Bibata-Modern-Ice/"
+	cp -a "${srcdir}/Bibata-Modern-Ice/cursor.theme" "${pkgdir}/usr/share/icons/Bibata-Modern-Ice/"
+	cp -a "${srcdir}/Bibata-Modern-Ice/index.theme" "${pkgdir}/usr/share/icons/Bibata-Modern-Ice/"
+}
+
+pre_install() {
+  log "Iniciando instalação"
+}
+
+post_install() {
+  log "Finalizando instalação"
+}
+
+pre_upgrade() {
+  log "Iniciando upgrade"
+}
+
+post_upgrade() {
+  log "Finalizando upgrade"
+}
+
