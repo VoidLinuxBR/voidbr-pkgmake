@@ -1039,6 +1039,9 @@ fetch() {
 			if [[ -d "$cname/.git" ]]; then
 				msg "Usando repositório git existente: $cname"
 				cmd_run git -C "$cname" remote set-url origin "$repo"
+				# cópia limpa a cada build (descarta patches e sobras do build anterior)
+				cmd_run git -C "$cname" reset -q --hard
+				cmd_run git -C "$cname" clean -qfdx
 
 				case "$ref_type" in
 				tag)
@@ -1466,6 +1469,7 @@ run_all() {
 	if ((HAS_PREPARE)); then
 		msg "Prepare"
 		extract
+		cd "$srcdir" || die "falha ao entrar em srcdir"
 		prepare
 	else
 		extract
@@ -1482,6 +1486,7 @@ run_all() {
 	# -------------------------------------------------
 	if ((HAS_BUILD)); then
 		msg "Build"
+		cd "$srcdir" || die "falha ao entrar em srcdir"
 		if ! build; then
 			die "Build falhou, abortando empacotamento"
 		fi
@@ -1519,6 +1524,7 @@ run_all() {
 		msg "Package step skipped (build_style=venom)"
 	elif ((HAS_PACKAGE)); then
 		msg "Package ${pkgname}"
+		cd "$srcdir" || die "falha ao entrar em srcdir"
 		if ! package; then
 			die "Package falhou, abortando empacotamento"
 		fi

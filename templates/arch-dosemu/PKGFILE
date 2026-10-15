@@ -42,7 +42,9 @@ prepare() {
 
 build() {
 	cd ${pkgname}
-	./configure \
+	# -mx86-used-note=no: evita .note.gnu.property no emufs.sys (binário DOS cru),
+	# que colide com .text no binutils recente
+	CC="gcc -Wa,-mx86-used-note=no" ./configure \
 		--prefix=/usr \
 		--with-fdtarball="${srcdir}/dosemu-freedos-1.0-bin.tgz" \
 		--mandir=/usr/share/man
