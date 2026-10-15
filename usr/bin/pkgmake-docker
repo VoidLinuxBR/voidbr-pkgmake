@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# pkgmake-docker - roda o pkgmake dentro de um container Void Linux limpo
+#
+# Uso (na pasta do PKGFILE, igual ao pkgmake):
+#   pkgmake-docker -s
+#   pkgmake-docker --build-image     # (re)constrói a imagem e sai
+#
+# Variáveis:
+#   PKGMAKE_IMAGE         imagem a usar   (padrão: voidbr/pkgmake-builder:latest)
+#   PKGMAKE_CACHE_VOLUME  volume do cache do xbps (padrão: pkgmake-xbps-cache)
+set -euo pipefail
+
+red=$'\e[1;31m'
+cyan=$'\e[1;36m'
+rst=$'\e[0m'
+
+msg() { echo -e "${cyan}==> $*${rst}"; }
+die() {
+	echo -e "${red}ERRO: $*${rst}" >&2
+	exit 1
+}
+
+IMAGE="${PKGMAKE_IMAGE:-voidbr/pkgmake-builder:latest}"
+CACHE_VOLUME="${PKGMAKE_CACHE_VOLUME:-pkgmake-xbps-cache}"
+
+# pkgmake e arquivos de suporte do host (mesmo layout no repositório e instalado)
+bindir="$(dirname "$(readlink -f "$0")")"
+host_pkgmake="$bindir/pkgmake"
+sharedir="$(readlink -f "$bindir/../share/pkgmake")"
+
+[[ -x "$host_pkgmake" ]] || die "pkgmake não encontrado em $host_pkgmake"
+[[ -f "$sharedir/docker/Dockerfile" ]] || die "Dockerfile não encontrado em $sharedir/docker"
+command -v docker >/dev/null 2>&1 || die "docker não encontrado"
+
+build_image() {
+	msg "Construindo imagem $IMAGE"
+	docker build -t "$IMAGE" "$sharedir/docker"
+}
+
+# configuração do host: PKGDEST, PACKAGER, SIGNPKG, PRIVKEY
+PKGDEST=""
+PACKAGER=""
+SIGNPKG=0
+PRIVKEY=""
+[[ -f /etc/pkgmake.conf ]] && source /etc/pkgmake.conf
+
+args=()
+while (($#)); do
+	case "$1" in
+	--build-image)
+		build_image
+		exit 0
+		;;
+	-k | --pkgdest)
+		[[ $# -ge 2 ]] || die "opção '$1' requer um argumento"
+		PKGDEST="$2"
+		shift 2
+		;;
+	--sign)
+		SIGNPKG=1
+		shift
+		;;
+	--privkey)
+		[[ $# -ge 2 ]] || die "opção '$1' requer um argumento"
+		PRIVKEY="$2"
+		shift 2
+		;;
+	*)
+		args+=("$1")
+		shift
+		;;
+	esac
+done
+
+[[ -n "$PKGDEST" ]] || die "PKGDEST não definido (use -k ou /etc/pkgmake.conf)"
+mkdir -p "$PKGDEST"
+
+if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+	build_image
+fi
+
+run_opts=(--rm -i)
+[[ -t 0 && -t 1 ]] && run_opts+=(-t)
+run_opts+=(
+	-e "PKGMAKE_UID=$(id -u)"
+	-e "PKGMAKE_GID=$(id -g)"
+	-v "$PWD:/build"
+	-w /build
+	-v "$(readlink -f "$PKGDEST"):/repo"
+	-v "$host_pkgmake:/usr/bin/pkgmake:ro"
+	-v "$sharedir:/usr/share/pkgmake:ro"
+	-v "$CACHE_VOLUME:/var/cache/xbps"
+)
+
+pm_args=(-k /repo)
+[[ -n "$PACKAGER" ]] && pm_args+=(--packager "$PACKAGER")
+
+# assinatura: a chave entra só como leitura, nunca na imagem
+if [[ "$SIGNPKG" == 1 ]]; then
+	[[ -n "$PRIVKEY" && -f "$PRIVKEY" ]] ||
+		die "SIGNPKG=1, mas PRIVKEY não aponta para uma chave existente: ${PRIVKEY:-(vazio)}"
+	run_opts+=(-v "$(readlink -f "$PRIVKEY"):/keys/privkey.pem:ro")
+	pm_args+=(--sign --privkey /keys/privkey.pem)
+fi
+
+msg "Build em container ($IMAGE)"
+exec docker run "${run_opts[@]}" "$IMAGE" "${pm_args[@]}" "${args[@]}"

@@ -4,9 +4,10 @@ ETCDIR  = /etc
 SHAREDIR = $(PREFIX)/share/pkgmake
 DOCDIR = $(PREFIX)/share/doc/pkgmake
 
-BIN_FILES = usr/bin/pkgmake
+BIN_FILES = usr/bin/pkgmake usr/bin/pkgmake-docker
 ETC_FILES = etc/pkgmake.conf
 SHARE_FILES = usr/share/pkgmake/*.sh
+DOCKER_FILES = usr/share/pkgmake/docker/*
 
 all:
 	@echo "Nada a compilar. Use: make install"
@@ -20,10 +21,13 @@ install:
 	install -m 755 $(BIN_FILES) $(DESTDIR)$(BINDIR)
 	install -m 755 $(ETC_FILES) $(ETCDIR)
 	install -m 644 $(SHARE_FILES) $(DESTDIR)$(SHAREDIR)
+	install -d $(DESTDIR)$(SHAREDIR)/docker
+	install -m 644 $(DOCKER_FILES) $(DESTDIR)$(SHAREDIR)/docker
 	install -m 644 README.md $(DESTDIR)$(DOCDIR)/README.md
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/pkgmake
+	rm -f $(DESTDIR)$(BINDIR)/pkgmake-docker
 	rm -f $(ETCDIR)/pkgmake.conf
 	rm -rf $(DESTDIR)$(SHAREDIR)
 	rm -rf $(DESTDIR)$(DOCDIR)
