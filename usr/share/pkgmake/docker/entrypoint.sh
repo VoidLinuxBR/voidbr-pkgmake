@@ -18,4 +18,13 @@ fi
 # sincroniza os índices e aceita a chave pública do repositório local, se houver
 yes | xbps-install -S >/dev/null 2>&1 || true
 
-exec sudo -H -u builder -- pkgmake "$@"
+# git nunca pede usuário/senha no container (falha em vez de travar)
+export GIT_TERMINAL_PROMPT=0
+
+# repositórios privados do GitHub: usa o GH_TOKEN do host, se repassado
+if [ -n "${GH_TOKEN:-}" ]; then
+	sudo -H -u builder git config --global \
+		url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
+fi
+
+exec sudo -H -u builder --preserve-env=GIT_TERMINAL_PROMPT -- pkgmake "$@"
