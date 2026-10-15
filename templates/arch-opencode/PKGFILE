@@ -19,7 +19,7 @@ depends=(
 #  'nodejs-lts-jod'
 #)
 makedepends=(
-	'bun-bin'
+	'bun-bin' # template local (templates/bun-bin), precisa estar no repositório
 	'git'
 )
 optdepends=(
@@ -35,7 +35,7 @@ b2sums=('1288de1314f02a21c06406bf2f4530b849acc056431c6d73c7ce092d456be4f25ff762b
 
 prepare() {
 	cd $pkgname
-	sed -i 's|"packageManager": "bun@1.4.2"|"packageManager": "bun@1.4.0"|' package.json
+	# o sed do Arch (bun@1.4.2 -> 1.4.0) não é necessário: o bun-bin do VoidBR já é 1.4.2
 	bun install --frozen-lockfile --ignore-scripts
 }
 
