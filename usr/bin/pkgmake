@@ -1092,7 +1092,8 @@ fetch() {
 			;;
 
 		http://* | https://*)
-			f="${s##*/}"
+			# nome::url → salva com o nome dado (como no makepkg do Arch)
+			f="${cname:-${s##*/}}"
 
 			if [[ -f "$f" ]]; then
 				msg "Source já existe, usando cache: $f"
