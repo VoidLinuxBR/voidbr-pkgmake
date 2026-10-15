@@ -1446,8 +1446,9 @@ run_all() {
 	# -------------------------------------------------
 	fetch
 
-	# helpers (opcionais)
-	pkg_has_fn extract && extract
+	# extrai ANTES de detectar o diretório da fonte (detect_src define $wrksrc
+	# pelas pastas em src/, que só existem depois da extração)
+	extract
 	detect_src
 
 	# -------------------------------------------------
@@ -1465,15 +1466,12 @@ run_all() {
 	fi
 
 	# -------------------------------------------------
-	# Extract / Prepare
+	# Prepare
 	# -------------------------------------------------
 	if ((HAS_PREPARE)); then
 		msg "Prepare"
-		extract
 		cd "$srcdir" || die "falha ao entrar em srcdir"
 		prepare
-	else
-		extract
 	fi
 
 	# -------------------------------------------------
