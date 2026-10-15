@@ -1,0 +1,3 @@
+# artefatos de build dos templates (vale para todas as pastas, inclusive as novas)
+templates/*/src/
+templates/*/pkg/
