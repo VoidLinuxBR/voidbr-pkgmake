@@ -1702,13 +1702,16 @@ create_repodata() {
 	0)
 		msg "Update repodata (incremental)"
 		#   cmd_run xbps-rindex -a "$PKGDEST"/*.xbps
-		cmd_run xbps-rindex -a "$PKGDEST/${PKGOUT}"
+		# -f: sobrescreve a entrada se o mesmo pkgver já estiver no índice
+		# (rebuild sem subir pkgrel, ex.: correção de depends)
+		cmd_run xbps-rindex -f -a "$PKGDEST/${PKGOUT}"
 		;;
 	2)
 		msg "Update repodata (incremental)"
 		#   cmd_run xbps-rindex -a "$PKGDEST"/*.xbps
 		shopt -s nullglob
-		cmd_run xbps-rindex -a $PKGDEST/*.xbps >/dev/null 2>&1
+		# -f: atualiza entradas de mesmo pkgver (sem reassinar pacotes)
+		cmd_run xbps-rindex -f -a $PKGDEST/*.xbps >/dev/null 2>&1
 		;;
 	1)
 		msg "Recreate repodata (hard reset)"

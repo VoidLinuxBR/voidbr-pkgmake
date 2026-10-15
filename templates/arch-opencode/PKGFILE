@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
-# NOTE: Imported from Arch Linux/AUR
 # Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
-# Maintainer: Carl Smedstad <carsme@archlinux.org>
-# Maintainer: Sven-Hendrik Haase <svenstaro@archlinux.org>
 
 pkgname=opencode
 pkgver=2.0.8
@@ -22,7 +19,7 @@ depends=(
 #  'nodejs-lts-jod'
 #)
 makedepends=(
-	'bun'
+	'bun-bin'
 	'git'
 )
 optdepends=(
@@ -62,12 +59,9 @@ build() {
 
 package() {
 	cd $pkgname
-	case $CARCH in
-	aarch64) dir=cli-linux-arm64 ;;
-	x86_64) dir=cli-linux-x64-baseline ;;
-	esac
-	install -vDm755 -t "$pkgdir/usr/bin" "packages/cli/dist/$dir/bin/opencode"
+	dir=cli-linux-x64-baseline
 
+	install -vDm755 -t "$pkgdir/usr/bin" "packages/cli/dist/$dir/bin/opencode"
 	install -vDm644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE
 
 	"$pkgdir/usr/bin/opencode" --completions bash |

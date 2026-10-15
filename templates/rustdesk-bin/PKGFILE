@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgbase=rustdesk-bin
+pkgname=rustdesk-bin
+pkgver=1.5.0
+pkgrel=1
+pkgdesc="Yet another remote desktop software, written in Rust. Works out of the box, no configuration required."
+url="https://github.com/rustdesk/rustdesk"
+license=('AGPL-3.0-only')
+arch=('x86_64')
+provides=("${pkgname%-bin}")
+conflicts=("${pkgname%-bin}")
+depends=(
+	'gtk+3'
+	'xdotool'
+	'libxcb'
+	'libXfixes'
+	'libpulseaudio'
+	'libva'
+	'libvdpau'
+	'pam'
+	'gst-plugins-base1'
+	'gstreamer1-pipewire'
+)
+optdepends=(
+	'libappindicator-gtk3: tray icon'
+	'libayatana-appindicator: tray icon'
+) options=('!strip' '!lto' '!debug')
+source=("${pkgbase%-bin}-${pkgver}-${pkgrel}-x86_64.pkg.tar.zst::$url/releases/download/${pkgver/_/-}/rustdesk-${pkgver/_/-}-0-x86_64.pkg.tar.zst")
+sha256sums=('e920621899aeaa18c6e7e23b2b565615e7dc957dc987494795ca7a94c3108d7d')
+sha256sums_aarch64=('1b436234e51ca59bfd3beba6ba81096be13a22a7e2f8b94bd45218b8c77e5e13')
+
+install=$pkgname.install
+
+package() {
+	install -d "${pkgdir}/usr/share/" "${pkgdir}/usr/bin/"
+	cp -r "${srcdir}/usr/share/rustdesk/" "${pkgdir}/usr/share/"
+	cp -r "${srcdir}/usr/share/icons/" "${pkgdir}/usr/share/"
+
+  ln -sf "/usr/share/rustdesk/rustdesk" "${pkgdir}/usr/bin/rustdesk"
+
+	install -Dm 644 "${srcdir}/usr/share/rustdesk/files/rustdesk.service" "${pkgdir}/usr/lib/systemd/system/rustdesk.service"
+	install -Dm 644 "${srcdir}/usr/share/rustdesk/files/rustdesk.desktop" "${pkgdir}/usr/share/applications/rustdesk.desktop"
+	install -Dm 644 "${srcdir}/usr/share/rustdesk/files/rustdesk-link.desktop" "${pkgdir}/usr/share/applications/rustdesk-link.desktop"
+
+	# Remove useless files
+	rm -r "${pkgdir}/usr/share/rustdesk/files/"
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+
+	sudo mkdir -p /etc/sv/rustdesk/log /var/log/rustdesk
+	sudo tee /etc/sv/rustdesk/run >/dev/null <<'EOF'
+#!/bin/sh
+exec 2>&1
+
+export PULSE_LATENCY_MSEC=60
+export PIPEWIRE_LATENCY=1024/48000
+
+ulimit -n 100000
+
+exec /usr/bin/rustdesk --service
+EOF
+
+	sudo tee /etc/sv/rustdesk/finish >/dev/null <<'EOF'
+#!/bin/sh
+pkill -f 'rustdesk --tray' 2>/dev/null || :
+pkill -f 'rustdesk --server' 2>/dev/null || :
+exit 0
+EOF
+
+	sudo tee /etc/sv/rustdesk/log/run >/dev/null <<'EOF'
+#!/bin/sh
+exec svlogd -tt /var/log/rustdesk
+EOF
+
+	sudo chmod +x \
+		/etc/sv/rustdesk/run \
+		/etc/sv/rustdesk/finish \
+		/etc/sv/rustdesk/log/run
+
+	sudo chown -R root:root /etc/sv/rustdesk /var/log/rustdesk
+
+	log "The RustDesk daemon must be started for RustDesk to work."
+	log "To start it automatically on boot, run 'vservice enable rustdesk' in a terminal."
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+	# Display instructions to enable the RustDesk service if it's not enabled
+	voidbrctl is-active rustdesk || post_install
+
+	# Marks the service for restart (the actual restart will be handled by the pacman hook "30-systemd-restart-marked.hook")
+	! voidbrctl is-active rustdesk || vservice restart rustdesk
+}
