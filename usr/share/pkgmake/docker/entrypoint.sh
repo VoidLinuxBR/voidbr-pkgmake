@@ -27,4 +27,11 @@ if [ -n "${GH_TOKEN:-}" ]; then
 		url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
 fi
 
-exec sudo -H -u builder --preserve-env=GIT_TERMINAL_PROMPT -- pkgmake "$@"
+rc=0
+sudo -H -u builder --preserve-env=GIT_TERMINAL_PROMPT -- pkgmake "$@" || rc=$?
+
+# limpeza do cache: remove os pacotes baixados que estão desatualizados
+# (mantém só a versão atual de cada um, para o próximo -s não baixar de novo)
+xbps-remove -Oy >/dev/null 2>&1 || true
+
+exit "$rc"
