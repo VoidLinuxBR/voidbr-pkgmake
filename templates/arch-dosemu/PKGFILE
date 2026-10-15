@@ -37,7 +37,7 @@ prepare() {
 	gendesk -n \
 		--pkgname=${pkgname} \
 		--pkgdesc='dos emulator' \
-		--categories='system;emulator'
+		--categories='System;Emulator'
 }
 
 build() {
