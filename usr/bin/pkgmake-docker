@@ -92,6 +92,9 @@ run_opts+=(
 	-v "$CACHE_VOLUME:/var/cache/xbps"
 )
 
+# repassa o GH_TOKEN (só se existir no host) para clonar repositórios privados
+[[ -n "${GH_TOKEN:-}" ]] && run_opts+=(-e GH_TOKEN)
+
 pm_args=(-k /repo)
 [[ -n "$PACKAGER" ]] && pm_args+=(--packager "$PACKAGER")
 
