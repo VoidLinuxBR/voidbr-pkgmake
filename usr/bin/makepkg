@@ -55,6 +55,10 @@ declare PKG_EXT='xbps'
 WORKDIR="$PWD"
 SRCDIR="$WORKDIR/src"
 PKGDIR="$WORKDIR/pkg"
+
+# como no makepkg do Arch: com CDPATH definido, 'cd' imprime o caminho
+# e suja saídas capturadas (ex.: pkgver())
+unset CDPATH
 ARCH="$(uname -m)"
 
 SYNCDEPS=0
@@ -968,9 +972,16 @@ sync_deps() {
 		if [[ "$d" =~ [\<\>\=] ]]; then
 			clean+=("$d")
 		else
+			# já instalado? pula (evita "ERROR: Package already installed")
+			xbps-query "$d" &>/dev/null && continue
 			clean+=("$(strip_dep_op "$d")")
 		fi
 	done
+
+	if [[ "${#clean[@]}" -eq 0 ]]; then
+		msg "makedepends já instalados"
+		return 0
+	fi
 
 	cmd_run sudo xbps-install -Sy "${clean[@]}"
 }
