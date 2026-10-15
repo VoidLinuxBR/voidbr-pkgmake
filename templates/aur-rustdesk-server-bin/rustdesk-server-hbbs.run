@@ -1,0 +1,6 @@
+#!/bin/sh
+# serviço runit do RustDesk (hbbs)
+exec 2>&1
+cd /opt/rustdesk-server/data || exit 1
+ulimit -n 100000
+exec chpst -u rustdeskserver:rustdeskserver /opt/rustdesk-server/hbbs
