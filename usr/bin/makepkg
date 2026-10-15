@@ -871,7 +871,7 @@ load_pkgfile() {
   local dir
 
 	# limpa possíveis funções herdadas do framework
-	unset -f package build prepare check install pre_remove post_remove pre_update post_update pre_install post_install 2>/dev/null || true
+	unset -f package build prepare pkgver check install pre_remove post_remove pre_update post_update pre_install post_install 2>/dev/null || true
 
   if [[ ! -f PKGFILE ]]; then
     dir=$PWD
@@ -975,6 +975,13 @@ sync_deps() {
 	cmd_run sudo xbps-install -Sy "${clean[@]}"
 }
 
+# fonte git no formato Arch: [nome::]git+URL ou [nome::]git://URL
+# fragmentos: #tag=  #branch=  #commit=   (query ?signed é ignorada)
+is_git_source() {
+	local s="${1#*::}"
+	[[ "$s" == git+* || "$s" == git://* ]]
+}
+
 fetch() {
 	[[ -n "$SRCDIR" ]] || die "SRCDIR não definido"
 	mkdir -p "$SRCDIR"
@@ -998,49 +1005,75 @@ fetch() {
 		fi
 
 		case "$s" in
-		git+*)
+		git+* | git://*)
 			repo="${s#git+}"
-			tag=""
+			ref_type=""
+			ref=""
 
-			if [[ "$repo" == *#tag=* ]]; then
-				tag="${repo##*#tag=}"
-				tag="${tag%%\?*}"
-				repo="${repo%%#tag=*}"
+			if [[ "$repo" == *#* ]]; then
+				frag="${repo#*#}"
+				frag="${frag%%\?*}"
+				repo="${repo%%#*}"
+				ref_type="${frag%%=*}"
+				ref="${frag#*=}"
+				case "$ref_type" in
+				tag | branch | commit) ;;
+				*) die "fragmento git não suportado: #$frag (use tag=, branch= ou commit=)" ;;
+				esac
 			fi
+			repo="${repo%%\?*}"
 
 			[[ -z "$cname" ]] && cname="$(basename "$repo" .git)"
 
 			if [[ -d "$cname/.git" ]]; then
 				msg "Usando repositório git existente: $cname"
-
 				cmd_run git -C "$cname" remote set-url origin "$repo"
 
-				if [[ -n "$tag" ]]; then
-					cmd_run git -C "$cname" fetch --depth=1 origin "refs/tags/$tag:refs/tags/$tag" ||
-						cmd_run git -C "$cname" fetch --tags
-
-					cmd_run git -C "$cname" checkout "$tag" ||
-						die "falha ao fazer checkout da tag $tag"
-				else
+				case "$ref_type" in
+				tag)
+					cmd_run git -C "$cname" fetch --depth=1 origin "refs/tags/$ref:refs/tags/$ref"
+					cmd_run git -C "$cname" checkout "$ref"
+					;;
+				branch)
+					cmd_run git -C "$cname" fetch --depth=1 origin "$ref"
+					cmd_run git -C "$cname" checkout -B "$ref" FETCH_HEAD
+					;;
+				commit)
+					# commit já presente? senão busca histórico completo
+					if ! git -C "$cname" cat-file -e "${ref}^{commit}" 2>/dev/null; then
+						if [[ "$(git -C "$cname" rev-parse --is-shallow-repository)" == true ]]; then
+							cmd_run git -C "$cname" fetch --unshallow origin
+						else
+							cmd_run git -C "$cname" fetch origin
+						fi
+					fi
+					cmd_run git -C "$cname" checkout "$ref"
+					;;
+				*)
 					cmd_run git -C "$cname" pull --ff-only
-				fi
+					;;
+				esac
 			else
 				msg "Fetching: ${yellow}$s${rst}"
 
-				if [[ -n "$tag" ]]; then
-					cmd_run git clone \
-						--recursive \
-						--branch "$tag" \
-						--depth=1 \
-						"$repo" "$cname" ||
-						die "falha ao clonar $repo ($tag)"
-				else
-					cmd_run git clone \
-						--recursive \
-						--depth=1 \
-						"$repo" "$cname" ||
-						die "falha ao clonar $repo"
-				fi
+				case "$ref_type" in
+				tag | branch)
+					cmd_run git clone --recursive --branch "$ref" --depth=1 "$repo" "$cname"
+					;;
+				commit)
+					# nem todo servidor permite buscar commit avulso: clone completo
+					cmd_run git clone "$repo" "$cname"
+					cmd_run git -C "$cname" checkout "$ref"
+					;;
+				*)
+					cmd_run git clone --recursive --depth=1 "$repo" "$cname"
+					;;
+				esac
+			fi
+
+			# submódulos acompanham o ref escolhido
+			if [[ -n "$ref_type" && -f "$cname/.gitmodules" ]]; then
+				cmd_run git -C "$cname" submodule update --init --recursive
 			fi
 			;;
 
@@ -1365,6 +1398,26 @@ sh_create_INSTALL() {
 	return 1
 }
 
+# pkgver() do PKGFILE (estilo Arch): roda após prepare(), dentro de $srcdir.
+# A saída substitui o pkgver= do PKGFILE (o arquivo PKGFILE não é alterado).
+run_pkgver_fn() {
+	pkg_has_fn pkgver || return 0
+
+	local newver
+	msg "Executando pkgver()"
+	newver="$(cd "$srcdir" && pkgver)" || die "pkgver() falhou"
+
+	# regras Arch (: / - espaço) + xbps (_ e ao menos um dígito)
+	if [[ -z "$newver" || "$newver" == *[[:space:]:/_-]* || ! "$newver" =~ [0-9] ]]; then
+		die "pkgver() retornou versão inválida: '${newver}'\n      ${rst}(proibido: espaço : / - _ ; exige ao menos um dígito)"
+	fi
+
+	if [[ "$newver" != "$pkgver" ]]; then
+		msg "pkgver: ${yellow}${pkgver:-(vazio)}${cyan} -> ${yellow}${newver}${rst}"
+	fi
+	pkgver="$newver"
+}
+
 run_all() {
 	# -------------------------------------------------
 	# Lint
@@ -1396,8 +1449,6 @@ run_all() {
 		mkdir -p "$PKG"
 	fi
 
-	PKGOUT="${pkgname}-${pkgver}_${pkgrel}.${ARCH}.xbps"
-
 	# -------------------------------------------------
 	# Extract / Prepare
 	# -------------------------------------------------
@@ -1408,6 +1459,12 @@ run_all() {
 	else
 		extract
 	fi
+
+	# -------------------------------------------------
+	# pkgver() (após prepare, como no makepkg do Arch)
+	# -------------------------------------------------
+	run_pkgver_fn
+	PKGOUT="${pkgname}-${pkgver}_${pkgrel}.${ARCH}.xbps"
 
 	# -------------------------------------------------
 	# Build
@@ -1961,7 +2018,7 @@ resolve_sources() {
 	HAS_GIT_SOURCE=0
 
 	for s in "${source[@]}"; do
-		[[ "$s" == *git+* ]] && HAS_GIT_SOURCE=1 || true
+		is_git_source "$s" && HAS_GIT_SOURCE=1 || true
 	done
 }
 
