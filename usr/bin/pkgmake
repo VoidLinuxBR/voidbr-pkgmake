@@ -1516,8 +1516,18 @@ run_all() {
 			sudo xbps-install -R "$PKGDEST" -S "$pkgname"
 		fi
 	else
-		cmd_run sudo xbps-install --dry-run -R "$PKGDEST" -S "$pkgname"
-		msg "Install with: ${yellow}sudo /usr/bin/xbps-install -R $PKGDEST -S $pkgname${rst}"
+		local built_pkgver="${pkgname}-${pkgver}_${pkgrel}"
+		local inst_pkgver
+		inst_pkgver="$(xbps-query -p pkgver "$pkgname" 2>/dev/null)"
+
+		if [[ "$inst_pkgver" == "$built_pkgver" ]]; then
+			# mesma versão instalada: xbps-install acusaria "already installed"
+			msg "${yellow}$built_pkgver${cyan} já está instalado (mesma versão)"
+			msg "Reinstall with: ${yellow}sudo /usr/bin/xbps-install -R $PKGDEST -S -f $pkgname${rst}"
+		else
+			cmd_run sudo xbps-install --dry-run -R "$PKGDEST" -S "$pkgname"
+			msg "Install with: ${yellow}sudo /usr/bin/xbps-install -R $PKGDEST -S $pkgname${rst}"
+		fi
 	fi
 }
 
