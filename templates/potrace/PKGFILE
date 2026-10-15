@@ -12,6 +12,7 @@ license=(GPL-2.0-only)
 depends=(glibc
 	zlib
 )
+makedepends=(zlib-devel)
 _archive="$pkgname-$pkgver"
 source=("http://potrace.sourceforge.net/download/$pkgver/$_archive.tar.gz"
 	potrace-1.16-lto.patch
