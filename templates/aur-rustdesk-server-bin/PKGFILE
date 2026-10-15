@@ -11,14 +11,14 @@ url="https://github.com/rustdesk/rustdesk-server"
 license=('AGPL3')
 provides=(${_pkgname})
 conflicts=("rustdesk-server-demo" "${_pkgname}")
+# pkgmake não usa source_<arch>: escolhe o .zip pela arquitetura da máquina
+_parch=$(uname -m | sed "s/x86_64/amd64/;s/aarch64/arm64v8/")
+# VoidBR usa runit: serviços em /etc/sv (os .service/.sysusers/.tmpfiles do Arch não são usados)
 source=(
-	"${_pkgname}-hbbs.service"
-	"${_pkgname}-hbbr.service"
-	"${_pkgname}.sysusers"
-	"${_pkgname}.tmpfiles"
+	"${_pkgname}-hbbs.run"
+	"${_pkgname}-hbbr.run"
+	"${_pkgname}-${pkgver}-${_parch}.zip::${url}/releases/download/${pkgver/_/-}/${_pkgname}-linux-${_parch}.zip"
 )
-source_x86_64=("${_pkgname}-${pkgver}-amd64.zip::${url}/releases/download/${pkgver/_/-}/${_pkgname}-linux-amd64.zip")
-source_aarch64=("${_pkgname}-${pkgver}-arm64.zip::${url}/releases/download/${pkgver/_/-}/${_pkgname}-linux-arm64v8.zip")
 
 sha256sums=('ab4826703bfa96f5371f02fcb4575fff435554d575213cedca8cb1f39564601e'
 	'bf6bdb07ae69d6cfde433781f23376036cb9ad2f1bc1fc7ee44bd56de38ad11d'
@@ -26,20 +26,18 @@ sha256sums=('ab4826703bfa96f5371f02fcb4575fff435554d575213cedca8cb1f39564601e'
 	'bdea355562f43f6045e2b52f6dbb4d84ffffa1efec464446b2b2e10e336d6ddb')
 sha256sums_x86_64=('0565c41affe6c3f409b0bddfaf5a24ccbf3f64f5f8e3fec250b69a0d5f6bdbcf')
 sha256sums_aarch64=('6a4ae3c5ca257a4278ded72fd17eb2ca4eeb0356a5425e63a3e7fcb0ec6c155c')
-install=${_pkgname}.install
-_parch=$(uname -m | sed "s/x86_64/amd64/;s/aarch64/arm64v8/")
 
 package() {
 	cd $srcdir
 	install -Dm755 ${_parch}/* -t ${pkgdir}/opt/${_pkgname}
 	mkdir ${pkgdir}/opt/${_pkgname}/data
 
-	install -Dm644 *.service -t ${pkgdir}/usr/lib/systemd/system
-
-	install -Dm644 $srcdir/rustdesk-server.sysusers \
-		${pkgdir}/usr/lib/sysusers.d/rustdesk-server.conf
-	install -Dm644 $srcdir/rustdesk-server.tmpfiles \
-		${pkgdir}/usr/lib/tmpfiles.d/rustdesk-server.conf
+	# serviços runit (+ supervise em /run, padrão do Void)
+	local sv
+	for sv in hbbs hbbr; do
+		install -Dm755 "${_pkgname}-${sv}.run" "${pkgdir}/etc/sv/${_pkgname}-${sv}/run"
+		ln -s "/run/runit/supervise.${_pkgname}-${sv}" "${pkgdir}/etc/sv/${_pkgname}-${sv}/supervise"
+	done
 }
 
 pre_install() {
@@ -48,6 +46,15 @@ pre_install() {
 
 post_install() {
 	log "Finalizando instalação"
+
+	# usuário de sistema e dono do diretório de dados (substitui sysusers/tmpfiles do Arch)
+	if ! getent passwd rustdeskserver >/dev/null; then
+		useradd -r -d /opt/rustdesk-server -s /bin/false -c "Rustdesk Server" rustdeskserver
+	fi
+	chown -R rustdeskserver:rustdeskserver /opt/rustdesk-server/data
+
+	log "Para ativar o ID/Rendezvous Server: sudo ln -s /etc/sv/rustdesk-server-hbbs /var/service/"
+	log "Para ativar o Relay Server:         sudo ln -s /etc/sv/rustdesk-server-hbbr /var/service/"
 }
 
 pre_upgrade() {
@@ -56,4 +63,5 @@ pre_upgrade() {
 
 post_upgrade() {
 	log "Finalizando upgrade"
+	post_install
 }
