@@ -8,13 +8,6 @@ RUN xbps-install -Syu xbps \
 	&& xbps-install -y base-devel bash git curl wget unzip fakeroot shfmt sudo shadow xz zstd ncurses \
 	&& rm -rf /var/cache/xbps/*
 
-# repositórios extras (mesmos do VoidBR: voidbr, chililinux, voidlinux.com.br)
-# para mudar: edite usr/share/pkgmake/docker/xbps.d/*.conf e rode pkgmake-docker --build-image
-COPY xbps.d/ /etc/xbps.d/
-# sincroniza e aceita as chaves públicas dos repositórios extras
-RUN yes | xbps-install -S \
-	&& rm -rf /var/cache/xbps/*
-
 # usuário de build (uid/gid ajustados no entrypoint para os do host)
 RUN useradd -m -s /bin/bash builder \
 	&& echo 'builder ALL=(ALL) NOPASSWD: ALL' >/etc/sudoers.d/builder \

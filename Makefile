@@ -8,7 +8,6 @@ BIN_FILES = usr/bin/pkgmake usr/bin/makepkg usr/bin/pkgmake-docker usr/bin/makep
 ETC_FILES = etc/pkgmake.conf
 SHARE_FILES = usr/share/pkgmake/*.sh
 DOCKER_FILES = usr/share/pkgmake/docker/Dockerfile usr/share/pkgmake/docker/entrypoint.sh usr/share/pkgmake/docker/pkgmake.conf
-DOCKER_REPO_FILES = usr/share/pkgmake/docker/xbps.d/*.conf
 
 all:
 	@echo "Nada a compilar. Use: make install"
@@ -24,8 +23,6 @@ install:
 	install -m 644 $(SHARE_FILES) $(DESTDIR)$(SHAREDIR)
 	install -d $(DESTDIR)$(SHAREDIR)/docker
 	install -m 644 $(DOCKER_FILES) $(DESTDIR)$(SHAREDIR)/docker
-	install -d $(DESTDIR)$(SHAREDIR)/docker/xbps.d
-	install -m 644 $(DOCKER_REPO_FILES) $(DESTDIR)$(SHAREDIR)/docker/xbps.d
 	install -m 644 README.md $(DESTDIR)$(DOCDIR)/README.md
 
 uninstall:

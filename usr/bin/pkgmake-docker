@@ -106,5 +106,13 @@ if [[ "$SIGNPKG" == 1 ]]; then
 	pm_args+=(--sign --privkey /keys/privkey.pem)
 fi
 
+# repositórios: os mesmos do /etc/xbps.d/ da máquina (só os http/https;
+# os locais, como o PKGDEST, não existem dentro do container)
+repos_conf="$(mktemp)"
+trap 'rm -f "$repos_conf"' EXIT
+grep -hE '^[[:space:]]*repository=https?://' /etc/xbps.d/*.conf 2>/dev/null >"$repos_conf" || true
+chmod 644 "$repos_conf"
+run_opts+=(-v "$repos_conf:/etc/xbps.d/10-host-repos.conf:ro")
+
 msg "Build em container ($IMAGE)"
-exec docker run "${run_opts[@]}" "$IMAGE" "${pm_args[@]}" "${args[@]}"
+docker run "${run_opts[@]}" "$IMAGE" "${pm_args[@]}" "${args[@]}"
