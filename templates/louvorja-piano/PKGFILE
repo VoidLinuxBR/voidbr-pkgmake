@@ -199,7 +199,6 @@ MimeType=application/x-louvorja-liturgy;
 EOF
 
 	# Licença
-	- install -Dm644
 	# o nome mudou entre versões (LICENSE.md até a 1.29, LICENSE depois)
 	local _lic
 	for _lic in LICENSE LICENSE.md; do
