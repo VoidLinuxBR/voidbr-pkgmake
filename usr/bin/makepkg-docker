@@ -26,10 +26,22 @@ CACHE_VOLUME="${PKGMAKE_CACHE_VOLUME:-pkgmake-xbps-cache}"
 # pkgmake e arquivos de suporte do host (mesmo layout no repositório e instalado)
 bindir="$(dirname "$(readlink -f "$0")")"
 host_pkgmake="$bindir/pkgmake"
-sharedir="$(readlink -f "$bindir/../share/pkgmake")"
 
-[[ -x "$host_pkgmake" ]] || die "pkgmake não encontrado em $host_pkgmake"
-[[ -f "$sharedir/docker/Dockerfile" ]] || die "Dockerfile não encontrado em $sharedir/docker"
+# pkgmake: o que está ao lado do script; se não houver, o do PATH
+[[ -x "$host_pkgmake" ]] || host_pkgmake="$(command -v pkgmake || true)"
+[[ -x "$host_pkgmake" ]] || die "pkgmake não encontrado"
+
+# arquivos do container: ao lado do script (repositório ou make install),
+# depois /usr/local e /usr
+sharedir=""
+for d in "$bindir/../share/pkgmake" /usr/local/share/pkgmake /usr/share/pkgmake; do
+	if [[ -f "$d/docker/Dockerfile" ]]; then
+		sharedir="$(readlink -f "$d")"
+		break
+	fi
+done
+[[ -n "$sharedir" ]] ||
+	die "Dockerfile não encontrado em $bindir/../share/pkgmake/docker, /usr/local/share/pkgmake/docker nem /usr/share/pkgmake/docker"
 command -v docker >/dev/null 2>&1 || die "docker não encontrado"
 
 build_image() {
