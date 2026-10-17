@@ -42,6 +42,8 @@ for d in "$bindir/../share/pkgmake" /usr/local/share/pkgmake /usr/share/pkgmake;
 done
 [[ -n "$sharedir" ]] ||
 	die "Dockerfile não encontrado em $bindir/../share/pkgmake/docker, /usr/local/share/pkgmake/docker nem /usr/share/pkgmake/docker"
+msg "Dockerfile: ${sharedir}/docker/Dockerfile"
+msg "pkgmake:    ${host_pkgmake}"
 command -v docker >/dev/null 2>&1 || die "docker não encontrado"
 
 build_image() {
