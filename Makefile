@@ -4,7 +4,7 @@ ETCDIR  = /etc
 SHAREDIR = $(PREFIX)/share/pkgmake
 DOCDIR = $(PREFIX)/share/doc/pkgmake
 
-BIN_FILES = usr/bin/pkgmake usr/bin/pkgmake-docker
+BIN_FILES = usr/bin/pkgmake usr/bin/makepkg usr/bin/pkgmake-docker usr/bin/makepkg-docker
 ETC_FILES = etc/pkgmake.conf
 SHARE_FILES = usr/share/pkgmake/*.sh
 DOCKER_FILES = usr/share/pkgmake/docker/*
@@ -27,7 +27,9 @@ install:
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/pkgmake
+	rm -f $(DESTDIR)$(BINDIR)/makepkg
 	rm -f $(DESTDIR)$(BINDIR)/pkgmake-docker
+	rm -f $(DESTDIR)$(BINDIR)/makepkg-docker
 	rm -f $(ETCDIR)/pkgmake.conf
 	rm -rf $(DESTDIR)$(SHAREDIR)
 	rm -rf $(DESTDIR)$(DOCDIR)
