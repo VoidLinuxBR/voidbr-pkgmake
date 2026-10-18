@@ -2,8 +2,8 @@
 # Contribuitor : Vilmar Catafesta <vcatafesta@gmail.com>
 
 pkgname=umbriel
-pkgver=0.1.0.r0.0
-pkgrel=9
+pkgver=0.1.0
+pkgrel=1
 pkgdesc="Wayland compositor built on wlroots"
 homepage="https://github.com/noctalia-dev/umbriel"
 license="MIT"
@@ -41,6 +41,14 @@ source=(
 md5sums=(
 	"SKIP"
 )
+
+pkgver() {
+	cd "${srcdir}/umbriel"
+
+	# 0.1.0git<data do commit>, no mesmo formato já publicado (0.1.0git20261001_1):
+	# sobe a cada commit novo do upstream, então o xbps atualiza quem já tem o pacote
+	printf '%sgit%s' "$(cat VERSION)" "$(git log -1 --format=%cd --date=format:%Y%m%d)"
+}
 
 build() {
 	cd "${srcdir}/umbriel"
