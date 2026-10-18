@@ -21,6 +21,7 @@ makedepends=(
 	libinput-devel
 	pixman-devel
 	libdrm-devel
+	libdisplay-info-devel
 	cairo-devel
 	pango-devel
 	tomlplusplus-devel
