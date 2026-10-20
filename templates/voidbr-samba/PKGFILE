@@ -20,7 +20,6 @@ makedepends=(
 	avahi-libs
 	base-devel
 	binutils
-	bind
 	bison
 	chrpath
 	cups-devel
@@ -32,7 +31,7 @@ makedepends=(
 	flex
 	gcc
 	glib-devel
-	glusterfs
+	glusterfs-devel
 	gnutls
 	gnutls-devel
 	gpgme-devel
@@ -57,7 +56,7 @@ makedepends=(
 	libtirpc
 	libtirpc-devel
 	libunwind-devel
-	liburing
+	liburing-devel
 	libuuid-devel
 	libxslt
 	linux-headers
@@ -73,7 +72,6 @@ makedepends=(
 	perl
 	perl-JSON
 	perl-Parse-Yapp
-	perl-Text-ParseWords
 	pkg-config
 	popt
 	popt-devel
@@ -108,6 +106,7 @@ depends=(
     python3-Markdown
     mit-krb5
     mit-krb5-client
+    tdb
 )
 
 build() {
