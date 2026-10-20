@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
-# NOTE: Imported from Arch Linux/AUR
 # Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
-# Maintainer: Peter Jung <ptr1337@archlinux.org>
-# Maintainer: Noctalia Team <team@noctalia.dev>
 
 _pkgname=noctalia
 pkgname=noctalia
