@@ -1,0 +1,68 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+_major=42
+pkgname=electron${_major}
+pkgver=42.11.18
+pkgrel=1
+pkgdesc='Build cross platform desktop apps with web technologies (binary release)'
+arch=('x86_64')
+url='https://electronjs.org'
+license=('MIT' 'custom:chromium')
+depends=(
+  gtk+3
+  nss
+  alsa-lib
+  libcups
+  libgbm
+  libxkbcommon
+  dbus-libs
+  eudev-libudev
+  at-spi2-core
+  atk
+  at-spi2-atk
+  libXcomposite
+  libXdamage
+  libXrandr
+  )
+makedepends=(unzip)
+options=('!strip' '!debug')
+source=("electron-v${pkgver}-linux-x64.zip::https://github.com/electron/electron/releases/download/v${pkgver}/electron-v${pkgver}-linux-x64.zip"
+	"${pkgname}.sh")
+sha256sums=('c703693e5df41a413dd0464888bbabc8537a7000fb6d6e4f027fea0e90481a96'
+	'SKIP')
+
+package() {
+	local _zip="electron-v${pkgver}-linux-x64.zip"
+
+	# Runtime do Electron em /usr/lib/electron42 (o code usa /usr/lib/electron42/electron)
+	install -dm 755 "$pkgdir/usr/lib/$pkgname"
+	unzip -oq "$_zip" -d "$pkgdir/usr/lib/$pkgname"
+	chmod -R u=rwX,go=rX "$pkgdir/usr/lib/$pkgname"
+	chmod 755 "$pkgdir/usr/lib/$pkgname"/{electron,chrome_crashpad_handler}
+
+	# chrome-sandbox precisa de suid root para o sandbox do Chromium
+	chmod 4755 "$pkgdir/usr/lib/$pkgname/chrome-sandbox"
+
+	# Wrapper com suporte a ~/.config/electron42-flags.conf
+	install -Dm 755 "${pkgname}.sh" "$pkgdir/usr/bin/$pkgname"
+
+	# Licenças
+	install -dm 755 "$pkgdir/usr/share/licenses/$pkgname"
+	mv "$pkgdir/usr/lib/$pkgname"/{LICENSE,LICENSES.chromium.html} "$pkgdir/usr/share/licenses/$pkgname/"
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+}
