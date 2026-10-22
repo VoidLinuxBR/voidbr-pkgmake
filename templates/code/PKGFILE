@@ -12,9 +12,8 @@ license=('MIT')
 depends=($_electron 'libsecret' 'libX11' 'libxkbfile' 'ripgrep')
 makedepends=(
   git
-  nodejs-lts-krypton
-  npm
-  python
+  nodejs
+  python3
   desktop-file-utils
   zip
   jq
