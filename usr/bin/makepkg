@@ -60,6 +60,8 @@ PKGDIR="$WORKDIR/pkg"
 # e suja saídas capturadas (ex.: pkgver())
 unset CDPATH
 ARCH="$(uname -m)"
+# como no makepkg do Arch: PKGBUILDs usam $CARCH (ex.: case "$CARCH" in x86_64)...)
+export CARCH="${CARCH:-$ARCH}"
 
 SYNCDEPS=0
 CLI_SYNCDEPS=""
