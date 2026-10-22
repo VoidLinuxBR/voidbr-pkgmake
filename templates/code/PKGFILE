@@ -9,7 +9,7 @@ pkgrel=1
 arch=('x86_64')
 url='https://github.com/microsoft/vscode'
 license=('MIT')
-depends=($_electron 'libsecret' 'libx11' 'libxkbfile' 'ripgrep')
+depends=($_electron 'libsecret' 'libX11' 'libxkbfile' 'ripgrep')
 makedepends=(
   git
   nodejs-lts-krypton
@@ -18,6 +18,11 @@ makedepends=(
   desktop-file-utils
   zip
   jq
+  pkg-config
+  libX11-devel
+  libxkbfile-devel
+  libsecret-devel
+  mit-krb5-devel
   )
 provides=()
 options=('!strip' '!debug')
@@ -35,36 +40,8 @@ sha512sums=('413c0d798cf791b5cd57f35601c2f268ebdd12cad698de69f74da0d8b72afca21ae
 	'e570b30cd470190aa56596913478d5fb8ba265a0f8c9d1408ea2118612cc69a360cc55e4523c3dc9c65f73e3dea53fc6620c97f6592fb9f86c3aca51ad3d9744'
 	'bfd1a1feb9e6250e086c5a8513f325a2623e6724c094f2125f0c6fb36b88d8416745bd5f5e21a7f6e82bc45104d8ea0050210a7ba46befcb99f39052bf7ece13')
 
-# Even though we don't officially support other archs, let's
-# allow the user to use this PKGBUILD to compile the package
-# for their architecture
-case "$CARCH" in
-i686)
-	_vscode_arch=ia32
-	_electron_arch=ia32
-	;;
-x86_64)
-	_vscode_arch=x64
-	_electron_arch=x64
-	;;
-armv7h)
-	_vscode_arch=arm
-	_electron_arch=armv7l
-	;;
-aarch64)
-	_vscode_arch=arm64
-	_electron_arch=arm64
-	;;
-riscv64)
-	_vscode_arch=riscv64
-	_electron_arch=riscv64
-	;;
-*)
-	# Needed for mksrcinfo
-	_vscode_arch=DUMMY
-	_electron_arch=DUMMY
-	;;
-esac
+# Compila somente para x86_64
+_vscode_arch=x64
 
 prepare() {
 	cd vscode
@@ -96,7 +73,7 @@ prepare() {
 	# Set the commit and build date
 	local _commit _date
 	_commit=$(git rev-parse HEAD)
-	_date=$(date -u -Is --date=@"$SOURCE_DATE_EPOCH" | sed 's/\+00:00/Z/')
+	_date=$(date -u -Is --date=@"${SOURCE_DATE_EPOCH:-$(date +%s)}" | sed 's/\+00:00/Z/')
 	sed -e "s/@COMMIT@/$_commit/" -e "s/@DATE@/$_date/" -i product.json
 
 	# Build native modules for system electron
@@ -140,8 +117,8 @@ build() {
 	cd vscode
 	export ELECTRON_SKIP_BINARY_DOWNLOAD=1 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 	export XDG_CACHE_HOME="$srcdir"
-	npm install --cpu=$_vscode_arch
-	npm add -S "node-ovsx-sign@~1.2.0"
+	npm install --cpu=$_vscode_arch || return 1
+	npm add -S "node-ovsx-sign@~1.2.0" || return 1
 	npm run gulp \
 		--openssl-legacy-provider \
 		vscode-linux-${_vscode_arch}-min
