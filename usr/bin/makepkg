@@ -2126,8 +2126,8 @@ dedup_repo() {
 	msg "Iniciando deduplicação de pacotes no repositório local: $PKGDEST"
 	AllOldPackages=$(find "$PKGDEST" -type f -iname "*.$PKG_EXT" | sort -Vr | awk -F "$FETCH_RE" 'lista[$1]++')
 	for old in $AllOldPackages; do
-		msg "${red}=>Removendo pacote antigo: [$((++count))] => $(basename "${old}") ${reset}"
-		msg "${red}=>Removendo pacote antigo: [$((count))] => $(basename "${old}.sig2") ${reset}"
+		msg "${yellow}=>Removendo pacote antigo: [$((++count))] => $(basename "${old}") ${reset}"
+		msg "${yellow}=>Removendo pacote antigo: [$((count))] => $(basename "${old}.sig2") ${reset}"
 		rm -f "${old}" "${old}".sig2 >/dev/null 2>&-
 		lretval=0
 	done
