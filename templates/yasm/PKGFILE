@@ -50,7 +50,9 @@ prepare() {
 
 build() {
 	cd "$pkgname"
-	CFLAGS+=' -ffat-lto-objects' \
+	# o fix do GCC 15 (64ef740) testa __STDC_VERSION__ >= 202311L, mas o GCC 14
+	# do Void em -std=gnu23 reporta 202000L e já trata false/true como keywords
+	CFLAGS+=' -ffat-lto-objects -std=gnu17' \
 		./configure --prefix=/usr
 	make
 }
