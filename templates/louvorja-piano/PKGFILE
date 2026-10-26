@@ -2,7 +2,7 @@
 # Maintainer: Catafesta <catafesta@chililinux.com>
 
 pkgname=louvorja-piano
-pkgver=1.31.2
+pkgver=1.33.0
 pkgrel=1
 pkgdesc="LouvorJA - PIANO - aplicativo desktop para gerenciamento de culto"
 provides=()  # "eu SOU o $pkgname pkg1, pra quem depender deles"
