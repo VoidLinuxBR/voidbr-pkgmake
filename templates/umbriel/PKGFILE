@@ -19,6 +19,7 @@ makedepends=(
 	wlroots0.20-devel
 	libxkbcommon-devel
 	libinput-devel
+	libei-devel
 	pixman-devel
 	libdrm-devel
 	libdisplay-info-devel
