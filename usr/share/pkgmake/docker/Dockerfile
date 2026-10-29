@@ -13,7 +13,6 @@ RUN useradd -m -s /bin/bash builder \
 	&& echo 'builder ALL=(ALL) NOPASSWD: ALL' >/etc/sudoers.d/builder \
 	&& chmod 440 /etc/sudoers.d/builder
 
-COPY pkgmake.conf /etc/pkgmake.conf
 COPY entrypoint.sh /usr/local/bin/pkgmake-entrypoint
 RUN chmod 755 /usr/local/bin/pkgmake-entrypoint
 

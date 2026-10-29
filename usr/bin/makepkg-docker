@@ -56,7 +56,9 @@ PKGDEST=""
 PACKAGER=""
 SIGNPKG=0
 PRIVKEY=""
-[[ -f /etc/pkgmake.conf ]] && source /etc/pkgmake.conf
+# sem /etc/pkgmake.conf no host não há build: o container usa o mesmo arquivo
+[[ -f /etc/pkgmake.conf ]] || die "/etc/pkgmake.conf não encontrado no host"
+source /etc/pkgmake.conf
 
 args=()
 while (($#)); do
@@ -106,6 +108,11 @@ run_opts+=(
 	-v "$CACHE_VOLUME:/var/cache/xbps"
 )
 
+# mesmo /etc/pkgmake.conf do host (somente leitura); PKGDEST, PACKAGER e a
+# chave continuam indo pela linha de comando (-k /repo, --packager, --privkey),
+# então os caminhos do host que estão no arquivo não atrapalham.
+run_opts+=(-v /etc/pkgmake.conf:/etc/pkgmake.conf:ro)
+
 # repassa o GH_TOKEN (só se existir no host) para clonar repositórios privados
 [[ -n "${GH_TOKEN:-}" ]] && run_opts+=(-e GH_TOKEN)
 
@@ -114,8 +121,26 @@ pm_args=(-k /repo)
 
 # assinatura: a chave entra só como leitura, nunca na imagem
 if [[ "$SIGNPKG" == 1 ]]; then
-	[[ -n "$PRIVKEY" && -f "$PRIVKEY" ]] ||
-		die "SIGNPKG=1, mas PRIVKEY não aponta para uma chave existente: ${PRIVKEY:-(vazio)}"
+	# sem PRIVKEY: procura nos mesmos lugares que o pkgmake
+	if [[ -z "$PRIVKEY" ]]; then
+		for k in "$HOME/.ssh/private.pem" "$HOME/.ssh/privkey.pem" \
+			"$HOME/.gnupg/private.pem" "$HOME/.gnupg/privkey.pem"; do
+			[[ -f "$k" ]] && PRIVKEY="$k" && break
+		done
+		: "${PRIVKEY:=$HOME/.ssh/privkey.pem}"
+	fi
+	# chave inexistente: cria aqui no host (dentro do container ela se perderia)
+	if [[ ! -f "$PRIVKEY" ]]; then
+		[[ -t 0 && -t 1 ]] ||
+			die "chave privada não encontrada: $PRIVKEY (crie com: pkgmake --gen-key)"
+		echo -e "${red}chave privada não encontrada: $PRIVKEY${rst}"
+		echo -e "${red}uma chave nova gera assinatura nova: as máquinas que já usam o seu repositório vão precisar aceitar a nova chave pública${rst}"
+		read -r -p "Criar a chave '$PRIVKEY' agora? [S/n]"
+		[[ -z "$REPLY" || "${REPLY^}" == [SY] ]] ||
+			die "assinatura cancelada: chave não encontrada: $PRIVKEY"
+		"$host_pkgmake" --gen-key --privkey "$PRIVKEY"
+		[[ -f "$PRIVKEY" ]] || die "não consegui criar a chave: $PRIVKEY"
+	fi
 	run_opts+=(-v "$(readlink -f "$PRIVKEY"):/keys/privkey.pem:ro")
 	pm_args+=(--sign --privkey /keys/privkey.pem)
 fi
