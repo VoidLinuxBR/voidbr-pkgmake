@@ -23,6 +23,8 @@ depends=(
 	ncurses
 	ncurses-devel
 	cmake
+	docker
+	shfmt
 )
 #conf_files=( /etc/pkgmake.conf /etc/vilmar.conf )
 backup=(/etc/pkgmake.conf)
