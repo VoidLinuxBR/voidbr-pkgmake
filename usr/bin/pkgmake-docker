@@ -150,6 +150,7 @@ run_opts=(--rm -i)
 run_opts+=(
 	-e "PKGMAKE_UID=$(id -u)"
 	-e "PKGMAKE_GID=$(id -g)"
+	-e "PKGMAKE_HOST_PKGDEST=$(readlink -f "$PKGDEST")"
 	-v "$PWD:/build"
 	-w /build
 	-v "$(readlink -f "$PKGDEST"):/repo"

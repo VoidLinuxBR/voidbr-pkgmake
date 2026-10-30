@@ -28,7 +28,8 @@ if [ -n "${GH_TOKEN:-}" ]; then
 fi
 
 rc=0
-sudo -H -u builder --preserve-env=GIT_TERMINAL_PROMPT -- pkgmake "$@" || rc=$?
+# PKGMAKE_HOST_PKGDEST: caminho real do PKGDEST no host, só para as mensagens
+sudo -H -u builder --preserve-env=GIT_TERMINAL_PROMPT,PKGMAKE_HOST_PKGDEST -- pkgmake "$@" || rc=$?
 
 # limpeza do cache: remove os pacotes baixados que estão desatualizados
 # (mantém só a versão atual de cada um, para o próximo -s não baixar de novo)

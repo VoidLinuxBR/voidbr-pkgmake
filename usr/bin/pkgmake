@@ -1619,10 +1619,10 @@ run_all() {
 		if [[ "$inst_pkgver" == "$built_pkgver" ]]; then
 			# mesma versão instalada: xbps-install acusaria "already installed"
 			msg "${yellow}$built_pkgver${cyan} já está instalado (mesma versão)"
-			msg "Reinstall with: ${yellow}sudo /usr/bin/xbps-install -R $PKGDEST -S -f $pkgname${rst}"
+			msg "Reinstall with: ${yellow}sudo /usr/bin/xbps-install -R ${PKGMAKE_HOST_PKGDEST:-$PKGDEST} -S -f $pkgname${rst}"
 		else
 			cmd_run sudo xbps-install --dry-run -R "$PKGDEST" -S "$pkgname"
-			msg "Install with: ${yellow}sudo /usr/bin/xbps-install -R $PKGDEST -S $pkgname${rst}"
+			msg "Install with: ${yellow}sudo /usr/bin/xbps-install -R ${PKGMAKE_HOST_PKGDEST:-$PKGDEST} -S $pkgname${rst}"
 		fi
 	fi
 }
@@ -2136,7 +2136,7 @@ dedup_repo() {
 	local AllOldPackages
 	local lretval=1
 
-	msg "Iniciando deduplicação de pacotes no repositório local: $PKGDEST"
+	msg "Iniciando deduplicação de pacotes no repositório local: ${PKGMAKE_HOST_PKGDEST:-$PKGDEST}"
 	AllOldPackages=$(find "$PKGDEST" -type f -iname "*.$PKG_EXT" | sort -Vr | awk -F "$FETCH_RE" 'lista[$1]++')
 	for old in $AllOldPackages; do
 		msg "${yellow}=>Removendo pacote antigo: [$((++count))] => $(basename "${old}") ${reset}"
