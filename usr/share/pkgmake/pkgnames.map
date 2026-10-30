@@ -1,0 +1,123 @@
+# pkgnames.map - equivalência de nomes de pacotes (Arch/Venom -> Void)
+#
+# Usado pelo "pkgmake new --from-arch" e "--from-venom" para traduzir
+# depends/makedepends, e pelo build para sugerir equivalentes.
+#
+# Formato (uma linha por pacote, campos separados por espaço):
+#   <nome-origem> <nome-void> [make] [devel=<pacote-devel>]
+#
+#   <nome-void>  "-" remove a dependência (não existe/não é usada no Void)
+#   make         ferramenta só de build: no Venom vai para o makedepends
+#   devel=       pacote -devel do Void quando NÃO segue o padrão <nome-void>-devel
+#
+# Regras automáticas (não precisam estar aqui):
+#   python-*  -> python3-*   (só Arch)
+#   lib32-*   -> removido
+#   se existir <nome-void>-devel no repositório, ele entra no makedepends
+#
+# Pacotes com o mesmo nome no Void só precisam estar aqui se forem "make"
+# ou tiverem "devel=".
+
+# --- bibliotecas / runtime --------------------------------------------
+gcc-libs                libgcc
+gtk2                    gtk+
+gtk3                    gtk+3
+glib2                   glib
+glib2-devel             glib-devel
+gdk-pixbuf2             gdk-pixbuf
+freetype2               freetype
+libtiff                 tiff
+icu                     icu
+xz                      liblzma
+zstd                    libzstd
+pcre2                   libpcre2         devel=pcre2-devel
+curl                    curl             devel=libcurl-devel
+libcurl-gnutls          libcurl
+libpulse                libpulseaudio    devel=pulseaudio-devel
+mesa                    mesa             devel=MesaLib-devel
+vulkan-icd-loader       vulkan-loader
+vulkan-headers          Vulkan-Headers
+nlohmann-json           json-c++
+libutil-linux           libuuid
+flac                    libflac
+lua                     lua54
+luajit                  LuaJIT
+qt5-base                qt5
+gstreamer               gstreamer1
+gst-plugins-base        gst-plugins-base1
+webkit2gtk-4.1          libwebkit2gtk41
+jdk-openjdk             openjdk
+java-runtime            openjdk-jre
+npm                     nodejs
+xorg-xwayland           xorg-server-xwayland
+python                  python3
+
+# --- X11: no Void os nomes têm maiúsculas -----------------------------
+libx11                  libX11
+libxext                 libXext
+libxrandr               libXrandr
+libxrender              libXrender
+libxfixes               libXfixes
+libxi                   libXi
+libxcursor              libXcursor
+libxinerama             libXinerama
+libxcomposite           libXcomposite
+libxdamage              libXdamage
+libxtst                 libXtst
+libxss                  libXScrnSaver
+libxft                  libXft
+
+# --- SDL ---------------------------------------------------------------
+sdl12-compat            SDL
+sdl2                    SDL2
+sdl2_image              SDL2_image
+sdl2_mixer              SDL2_mixer
+sdl2_ttf                SDL2_ttf
+sdl3                    SDL3
+
+# --- não existem / não são usados no Void ------------------------------
+systemd                 -
+systemd-libs            -
+libsystemd              -
+
+# --- ferramentas só de build -------------------------------------------
+pkgconf                 pkg-config       make
+pkg-config              pkg-config       make
+cmake                   cmake            make
+meson                   meson            make
+ninja                   ninja            make
+autoconf                autoconf         make
+automake                automake         make
+libtool                 libtool          make
+make                    make             make
+gcc                     gcc              make
+clang                   clang            make
+nasm                    nasm             make
+yasm                    yasm             make
+git                     git              make
+patch                   patch            make
+gettext                 gettext          make
+intltool                intltool         make
+gperf                   gperf            make
+bison                   bison            make
+flex                    flex             make
+vala                    vala             make
+glslang                 glslang          make
+help2man                help2man         make
+asciidoc                asciidoc         make
+asciidoctor             ruby-asciidoctor make
+scdoc                   scdoc            make
+doxygen                 doxygen          make
+wayland-protocols       wayland-protocols make
+hyprwayland-scanner     hyprwayland-scanner make
+python-setuptools       python3-setuptools make
+python-build            python3-build    make
+python-installer        python3-installer make
+python-wheel            python3-wheel    make
+python3-setuptools      python3-setuptools make
+python3-build           python3-build    make
+python3-installer       python3-installer make
+python3-wheel           python3-wheel    make
+rust                    rust             make
+cargo                   cargo            make
+go                      go               make

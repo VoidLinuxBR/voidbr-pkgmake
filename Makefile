@@ -6,7 +6,7 @@ DOCDIR = $(PREFIX)/share/doc/pkgmake
 
 BIN_FILES = usr/bin/pkgmake usr/bin/makepkg usr/bin/pkgmake-docker usr/bin/makepkg-docker
 ETC_FILES = etc/pkgmake.conf
-SHARE_FILES = usr/share/pkgmake/*.sh
+SHARE_FILES = usr/share/pkgmake/*.sh usr/share/pkgmake/pkgnames.map
 DOCKER_FILES = usr/share/pkgmake/docker/Dockerfile usr/share/pkgmake/docker/entrypoint.sh
 
 all:
