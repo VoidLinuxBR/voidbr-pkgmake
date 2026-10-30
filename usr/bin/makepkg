@@ -4,7 +4,7 @@
 #
 #  pkgmake — makepkg-like tool for Void XBPS
 #  Created: dom 21 dez 2025 11:47:51 -04
-#  Updated: qui 29 out 2026 23:45:25 -04
+#  Updated: qui 29 out 2026 23:49:54 -04
 #
 #  Copyright (c) 2019-2026, Vilmar Catafesta <vcatafesta@gmail.com>
 #  Assembled By Vilmar Catafesta for the ChiliLinux project.
@@ -752,6 +752,7 @@ FEDORA_SUBST=(
 	'%{_sysconfdir}' '/etc'
 	'%{_localstatedir}' '/var'
 	'%{_unitdir}' '/usr/lib/systemd/system'
+	'%{?_smp_mflags}' '-j$(nproc)'
 	'%{_smp_mflags}' '-j$(nproc)'
 	'%{optflags}' '$CFLAGS'
 	'%{build_ldflags}' '$LDFLAGS'
@@ -836,14 +837,15 @@ from_fedora() {
 	sub=0 # dentro de %package de subpacote
 	while IFS= read -r line || [[ -n "$line" ]]; do
 		case "$line" in
+		# %prep antes de %pre*: senão "%prep" casaria com "%pre*"
+		%prep*) section="prep" ; continue ;;
+		%build*) section="build" ; continue ;;
+		%install*) section="install" ; continue ;;
 		%package*) sub=1 section="" ; continue ;;
 		%description* | %files* | %changelog* | %pre* | %post* | %check* | %preun* | %postun* | %posttrans*)
 			section="skip"
 			continue
 			;;
-		%prep*) section="prep" ; continue ;;
-		%build*) section="build" ; continue ;;
-		%install*) section="install" ; continue ;;
 		esac
 
 		case "$section" in
@@ -866,12 +868,12 @@ from_fedora() {
 		tag="${BASH_REMATCH[1]}"
 		val="$(fedora_expand "${BASH_REMATCH[2]}")"
 		case "$tag" in
-		Name) name="$val"; FEDORA_MACROS[name]="$val" ;;
-		Version) version="$val"; FEDORA_MACROS[version]="$val" ;;
+		Name) name="$val"; FEDORA_MACROS[name]="$val"; FEDORA_MACROS[NAME]="$val" ;;
+		Version) version="$val"; FEDORA_MACROS[version]="$val"; FEDORA_MACROS[VERSION]="$val" ;;
 		Release) release="${val%%%*}"; release="${release%%.*}" ;;
 		Summary) ((sub)) || summary="$val" ;;
 		License) ((sub)) || license="$val" ;;
-		URL) url="$val"; FEDORA_MACROS[url]="$val" ;;
+		URL) url="$val"; FEDORA_MACROS[url]="$val"; FEDORA_MACROS[URL]="$val" ;;
 		Source*)
 			n="${tag#Source}"
 			n="${n:-0}"
@@ -880,6 +882,8 @@ from_fedora() {
 				srcs+=("$val")
 			elif [[ -f "${val##*/}" ]]; then
 				locals+=("${val##*/}")
+			else
+				warn "Source do .spec não resolvido: $val"
 			fi
 			;;
 		Patch*)
