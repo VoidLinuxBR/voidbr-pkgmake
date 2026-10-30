@@ -67,6 +67,9 @@ libxtst                 libXtst
 libxss                  libXScrnSaver
 libxft                  libXft
 
+# --- nomes com maiúsculas no Void ------------------------------------
+waybar                  Waybar
+
 # --- SDL ---------------------------------------------------------------
 sdl12-compat            SDL
 sdl2                    SDL2
@@ -77,6 +80,7 @@ sdl3                    SDL3
 
 # --- não existem / não são usados no Void ------------------------------
 systemd                 -
+sh                      -
 systemd-libs            -
 libsystemd              -
 

@@ -4,7 +4,7 @@
 #
 #  pkgmake — makepkg-like tool for Void XBPS
 #  Created: dom 21 dez 2025 11:47:51 -04
-#  Updated: sex 30 out 2026 00:45:57 -04
+#  Updated: sex 30 out 2026 01:20:36 -04
 #
 #  Copyright (c) 2019-2026, Vilmar Catafesta <vcatafesta@gmail.com>
 #  Assembled By Vilmar Catafesta for the ChiliLinux project.
@@ -688,7 +688,9 @@ from_alpine() {
 		echo "CBUILD=\"\$(gcc -dumpmachine)\""
 		echo "CHOST=\"\$CBUILD\""
 		echo "CARCH=\"\$(uname -m)\""
-		echo "builddir=\"$builddir\""
+		# o srcdir só existe na hora do build: o builddir é montado dentro de cada etapa
+		echo "_alpine_builddir=\"${builddir#\$srcdir/}\""
+		echo '_alpine_cd() { builddir="$srcdir/$_alpine_builddir"; cd "$builddir"; }'
 		echo
 		echo "default_prepare() {"
 		echo "	local p"
@@ -701,12 +703,12 @@ from_alpine() {
 		echo "$fns"
 		echo
 		if grep -q '^_alpine_prepare ' <<<"$fns"; then
-			echo 'prepare() { cd "$builddir" && _alpine_prepare; }'
+			echo 'prepare() { _alpine_cd && _alpine_prepare; }'
 		else
-			echo 'prepare() { cd "$builddir" && default_prepare; }'
+			echo 'prepare() { _alpine_cd && default_prepare; }'
 		fi
-		grep -q '^_alpine_build ' <<<"$fns" && echo 'build() { cd "$builddir" && _alpine_build; }'
-		grep -q '^_alpine_package ' <<<"$fns" && echo 'package() { cd "$builddir" && _alpine_package; }'
+		grep -q '^_alpine_build ' <<<"$fns" && echo 'build() { _alpine_cd && _alpine_build; }'
+		grep -q '^_alpine_package ' <<<"$fns" && echo 'package() { _alpine_cd && _alpine_package; }'
 		echo
 		sh_pre_post_install
 	} >PKGFILE
@@ -2183,7 +2185,7 @@ fetch() {
 			fi
 			;;
 
-		http://* | https://*)
+		http://* | https://* | ftp://*)
 			# nome::url → salva com o nome dado (como no makepkg do Arch)
 			f="${cname:-${s##*/}}"
 
@@ -3027,6 +3029,12 @@ resolve_fns() {
 
 	pkg_has_fn package && HAS_PACKAGE=1
 	pkg_has_fn do_install && HAS_PACKAGE=1
+
+	# template do Void com build_style (ex.: gnu-configure) sem funções próprias
+	case "${build_style:-}" in
+	"" | local | manual-install | venom) ;;
+	*) HAS_BUILD_STYLE=1 ;;
+	esac
 
 	IS_LOCAL_SOURCE=0
 	# declaração explícita
