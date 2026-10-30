@@ -24,6 +24,7 @@ depends=(
 	ncurses-devel
 	cmake
 	docker
+	docker-buildx
 	shfmt
 )
 #conf_files=( /etc/pkgmake.conf /etc/vilmar.conf )
@@ -67,6 +68,31 @@ post_install() {
 			usermod -aG docker "$user"
 			log "usuário '$user' adicionado ao grupo docker (saia e entre de novo na sessão, ou rode: newgrp docker)"
 		fi
+	fi
+
+	# serviço docker: dentro de chroot (ex.: geração de ISO) não mexe no serviço
+	if [ "$(stat -c %d:%i /)" != "$(stat -c %d:%i /proc/1/root/. 2>/dev/null)" ]; then
+		log "chroot detectado: ative o docker depois com: vservice add docker"
+	elif sv status docker 2>/dev/null | grep -q '^run:'; then
+		log "serviço docker ativo"
+	elif [ -t 0 ]; then
+		printf "%s" "${YELLOW}Serviço docker não está ativo. Ativar e subir agora? [S/n] ${RESET}"
+		read -r resp || resp=n
+		case "$resp" in
+		"" | [SsYy]*)
+			vservice add docker
+			if sv status docker 2>/dev/null | grep -q '^run:'; then
+				log "serviço docker ativo"
+			else
+				log "serviço docker não subiu; verifique com: sv status docker"
+			fi
+			;;
+		*)
+			log "serviço docker não ativado; para ativar: vservice add docker"
+			;;
+		esac
+	else
+		log "serviço docker não está ativo; para ativar: vservice add docker"
 	fi
 }
 
