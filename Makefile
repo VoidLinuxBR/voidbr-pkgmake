@@ -7,7 +7,7 @@ DOCDIR = $(PREFIX)/share/doc/pkgmake
 BIN_FILES = usr/bin/pkgmake usr/bin/makepkg usr/bin/pkgmake-docker usr/bin/makepkg-docker
 ETC_FILES = etc/pkgmake.conf
 SHARE_FILES = usr/share/pkgmake/*.sh
-DOCKER_FILES = usr/share/pkgmake/docker/Dockerfile usr/share/pkgmake/docker/entrypoint.sh usr/share/pkgmake/docker/pkgmake.conf
+DOCKER_FILES = usr/share/pkgmake/docker/Dockerfile usr/share/pkgmake/docker/entrypoint.sh
 
 all:
 	@echo "Nada a compilar. Use: make install"

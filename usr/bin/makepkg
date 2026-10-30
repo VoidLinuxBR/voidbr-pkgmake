@@ -69,6 +69,7 @@ CLI_SYNCDEPS=""
 INSTALLPKG=0
 FORCEPKG=0
 PRIVKEY=""
+CLI_PRIVKEY=""
 
 SIGNPKG=0
 CLI_SIGNPKG=""
@@ -686,11 +687,7 @@ validate_config() {
 
 	# Assinatura
 	if [[ "$SIGNPKG" -eq 1 ]]; then
-		if [[ -n "$PRIVKEY" ]]; then
-			[[ -f "$PRIVKEY" ]] || die "PRIVKEY definido, mas chave não encontrada: $PRIVKEY"
-		else
-			find_privkey || die "SIGNPKG=1, mas nenhuma chave privada encontrada"
-		fi
+		ensure_privkey
 	fi
 
 	# ---------------------------------------------
@@ -789,16 +786,40 @@ VERBOSE=${red}${VERBOSE:-0}${rst}
 EOF
 }
 
+# gera a chave no caminho do PRIVKEY (--privkey ou /etc/pkgmake.conf);
+# sem PRIVKEY definido, usa ~/.ssh/privkey.pem
 gen_key() {
-	if [[ -f "$HOME/.ssh/$KEY_FILE" ]]; then
-		if ! readconf "Chave '$HOME/.ssh/${KEY_FILE}' já existe! Sobrescrever?"; then
-			die "chave já existe: $KEY_FILE"
+	local key="${PRIVKEY:-$HOME/.ssh/$KEY_FILE}"
+
+	if [[ -f "$key" ]]; then
+		if ! readconf "Chave '$key' já existe! Sobrescrever?"; then
+			die "chave já existe: $key"
 		fi
-		rm -f "$HOME/.ssh/$KEY_FILE"
+		rm -f "$key" "$key.pub"
 	fi
-	msg "Gerando chave RSA 4096 bits (PEM): $KEY_FILE"
-	cmd_run ssh-keygen -t rsa -b 4096 -m PEM -f "$HOME/.ssh/$KEY_FILE"
-	msg "Chave gerada com sucesso: $HOME/.ssh/$KEY_FILE"
+	mkdir -p "$(dirname "$key")" || die "não consegui criar o diretório da chave: $(dirname "$key")"
+	msg "Gerando chave RSA 4096 bits (PEM): $key"
+	cmd_run ssh-keygen -t rsa -b 4096 -m PEM -f "$key"
+	chmod 600 "$key"
+	PRIVKEY="$key"
+	msg "Chave gerada com sucesso: $key"
+	warn "chave nova = assinatura nova: as máquinas que já usam o seu repositório precisam aceitar a nova chave pública"
+}
+
+# garante que a chave de assinatura existe; se não existir, oferece criar
+# (só em terminal interativo; em CI/scripts para com erro)
+ensure_privkey() {
+	[[ -n "$PRIVKEY" ]] || find_privkey || PRIVKEY="$HOME/.ssh/$KEY_FILE"
+	[[ -f "$PRIVKEY" ]] && return 0
+
+	if [[ -t 0 && -t 1 ]]; then
+		warn "chave privada não encontrada: $PRIVKEY"
+		warn "uma chave nova gera assinatura nova: as máquinas que já usam o seu repositório vão precisar aceitar a nova chave pública"
+		readconf "Criar a chave '$PRIVKEY' agora?" || die "assinatura cancelada: chave não encontrada: $PRIVKEY"
+		gen_key
+	else
+		die "chave privada não encontrada: $PRIVKEY (crie com: pkgmake --gen-key)"
+	fi
 }
 
 # get_repo_pkgver <nome-do-pacote> <repositorio-oficial>
@@ -1236,7 +1257,7 @@ find_privkey() {
 			return 0
 		}
 	done
-	die "chave privada não encontrada"
+	return 1
 }
 
 sh_create_REMOVE() {
@@ -1824,11 +1845,7 @@ create_repodata() {
 
 	# assina o índice (se habilitado)
 	if [[ "$SIGNPKG" -eq 1 ]]; then
-		if [[ -n "$PRIVKEY" ]]; then
-			[[ -f "$PRIVKEY" ]] || die "PRIVKEY definido, mas chave não encontrada: $PRIVKEY"
-		else
-			find_privkey || die "Nenhuma chave privada encontrada para assinatura"
-		fi
+		ensure_privkey
 
 		local signedby=()
 		[[ -n "$PACKAGER" ]] && signedby=(--signedby "$PACKAGER")
@@ -1843,11 +1860,7 @@ create_repodata() {
 sign_only() {
 	local PKGOUT="$1"
 
-	if [[ -n "$PRIVKEY" ]]; then
-		[[ ! -f "$PRIVKEY" ]] && die "PRIVKEY definido, mas chave não encontrada: $PRIVKEY"
-	else
-		find_privkey || die "Nenhuma chave privada encontrada para assinatura"
-	fi
+	ensure_privkey
 
 	shopt -s nullglob
 
@@ -2186,7 +2199,10 @@ while [[ $# -gt 0 ]]; do
 		shift
 		;;
 	--privkey)
-		PRIVKEY="$2"
+		if [[ $# -lt 2 || "$2" == -* ]]; then
+			die "opção '$1' requer um argumento (caminho da chave)"
+		fi
+		CLI_PRIVKEY="$2"
 		shift 2
 		;;
 	-c | --clean)
@@ -2232,12 +2248,15 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
+parse_config
+# --privkey da linha de comando tem prioridade sobre o PRIVKEY do /etc/pkgmake.conf
+[[ -n "$CLI_PRIVKEY" ]] && PRIVKEY="$CLI_PRIVKEY"
+
 if ((GEN_KEY)); then
 	gen_key
 	exit 0
 fi
 
-parse_config
 resolve_reindex
 resolve_pkgdest # BUGFIX: garante PKGDEST válido também nos atalhos --sign-only/--reindex-only/--reindex-all
 
