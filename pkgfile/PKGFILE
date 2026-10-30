@@ -52,13 +52,29 @@ pre_install() {
 }
 
 post_install() {
-	log "Finalizando instalação"
+	if [ "${update:-}" = "yes" ]; then
+		log "Finalizando upgrade"
+	else
+		log "Finalizando instalação"
+	fi
+
+	# grupo docker: o pkgmake-docker precisa rodar o docker sem sudo
+	getent group docker >/dev/null 2>&1 || groupadd -r docker
+	if [ -n "$user" ]; then
+		if id -nG "$user" | grep -qw docker; then
+			log "usuário '$user' já está no grupo docker"
+		else
+			usermod -aG docker "$user"
+			log "usuário '$user' adicionado ao grupo docker (saia e entre de novo na sessão, ou rode: newgrp docker)"
+		fi
+	fi
 }
 
 pre_upgrade() {
 	log "Iniciando upgrade"
 }
 
+# o INSTALL gerado pelo pkgmake só chama post_upgrade no upgrade
 post_upgrade() {
-	log "Finalizando upgrade"
+	post_install
 }
