@@ -25,6 +25,7 @@ depends=(
 	cmake
 	docker
 	docker-buildx
+	jq
 	shfmt
 )
 #conf_files=( /etc/pkgmake.conf /etc/vilmar.conf )
