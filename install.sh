@@ -2,96 +2,64 @@
 set -e
 
 # pkgmake installer
-# Instalação direta via GitHub (wget ou curl)
+# Instalação direta via GitHub (wget ou curl), igual ao "make install"
 #
 # Uso:
-#   curl -fsSL https://raw.githubusercontent.com/voidlinuxbr/pkgmake/main/install.sh | sudo bash
-#   wget -qO-  https://raw.githubusercontent.com/voidlinuxbr/pkgmake/main/install.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/voidlinuxbr/voidbr-pkgmake/main/install.sh | sudo bash
+#   wget -qO-  https://raw.githubusercontent.com/voidlinuxbr/voidbr-pkgmake/main/install.sh | sudo bash
 
-REPO_URL="https://raw.githubusercontent.com/voidlinuxbr/pkgmake/main"
-
-BIN_DIR="/usr/bin"
-SHARE_DIR="/usr/share/pkgmake"
-CONF_DEST="/etc/pkgmake.conf"
+TARBALL_URL="https://github.com/voidlinuxbr/voidbr-pkgmake/archive/refs/heads/main.tar.gz"
 
 TMPDIR="$(mktemp -d)"
 
 die() {
-  echo "erro: $*" >&2
-  exit 1
+	echo "erro: $*" >&2
+	exit 1
 }
 
 info() {
-  echo "==> $*"
-}
-
-need_cmd() {
-  command -v "$1" >/dev/null 2>&1 || die "comando '$1' não encontrado"
+	echo "==> $*"
 }
 
 cleanup() {
-  rm -rf "$TMPDIR"
+	rm -rf "$TMPDIR"
 }
 trap cleanup EXIT
 
-# Checagens básicas
-need_cmd install
-need_cmd mkdir
-need_cmd rm
-
 if [[ $EUID -ne 0 ]]; then
-  die "execute este instalador como root (sudo)"
+	die "execute este instalador como root (sudo)"
 fi
+
+command -v tar >/dev/null 2>&1 || die "comando 'tar' não encontrado"
 
 # Downloader
 if command -v curl >/dev/null 2>&1; then
-  DL="curl -fsSL"
+	DL="curl -fsSL"
 elif command -v wget >/dev/null 2>&1; then
-  DL="wget -qO-"
+	DL="wget -qO-"
 else
-  die "necessário 'curl' ou 'wget' para download"
+	die "necessário 'curl' ou 'wget' para download"
 fi
 
-info "Baixando arquivos do GitHub..."
-
-# Binários
-$DL "$REPO_URL/usr/bin/pkgmake" > "$TMPDIR/pkgmake"
-chmod +x "$TMPDIR/pkgmake"
-
-# Share files
-info "Baixando arquivos auxiliares..."
-mkdir -p "$TMPDIR/share"
-
-for f in autotools.sh cmake.sh python.sh pkgnames.map; do
-  $DL "$REPO_URL/usr/share/pkgmake/$f" > "$TMPDIR/share/$f"
-done
-
-# Configuração
-HAS_CONF=0
-if $DL "$REPO_URL/etc/pkgmake.conf" > "$TMPDIR/pkgmake.conf" 2>/dev/null; then
-  HAS_CONF=1
+# make: o instalador usa o Makefile do repositório
+if ! command -v make >/dev/null 2>&1; then
+	command -v xbps-install >/dev/null 2>&1 || die "comando 'make' não encontrado"
+	info "Instalando make..."
+	xbps-install -Sy make
 fi
 
-info "Instalando arquivos..."
+info "Baixando voidbr-pkgmake do GitHub..."
+$DL "$TARBALL_URL" | tar -xz -C "$TMPDIR" || die "falha ao baixar/extrair $TARBALL_URL"
 
-# Instala binários
-install -Dm755 "$TMPDIR/pkgmake" "$BIN_DIR/pkgmake"
+SRC="$(find "$TMPDIR" -mindepth 1 -maxdepth 1 -type d | head -n1)"
+[[ -f "$SRC/Makefile" ]] || die "Makefile não encontrado no pacote baixado"
 
-# Instala arquivos de suporte
-for f in "$TMPDIR"/share/*; do
-  install -Dm644 "$f" "$SHARE_DIR/$(basename "$f")"
-done
-
-# Instala configuração (estilo new)
-if [[ "$HAS_CONF" -eq 1 ]]; then
-  if [[ -f "$CONF_DEST" ]]; then
-    info "Configuração existente encontrada em $CONF_DEST"
-    info "Instalando nova configuração como ${CONF_DEST}.new"
-    install -Dm644 "$TMPDIR/pkgmake.conf" "${CONF_DEST}.new"
-  else
-    info "Instalando configuração padrão em $CONF_DEST"
-    install -Dm644 "$TMPDIR/pkgmake.conf" "$CONF_DEST"
-  fi
+info "Instalando (make install)..."
+# no "curl | sudo bash" o stdin é o próprio script: perguntas leem do terminal
+if [[ -r /dev/tty ]] && { : </dev/tty; } 2>/dev/null; then
+	make -C "$SRC" install </dev/tty
+else
+	make -C "$SRC" install </dev/null
 fi
 
 info "Instalação concluída com sucesso."
