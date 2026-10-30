@@ -348,6 +348,7 @@ from_venom() {
 			esac
 		done
 
+		translate_pkgfile_deps venom PKGFILE
 		shfmt -w PKGFILE
 		msg "PKGFILE criado com sucesso."
 		msg "Entre no diretório com: cd ${DIRPKGFILE}"
@@ -575,6 +576,8 @@ from_arch() {
 		echo
 		sh_pre_post_install
 	} >PKGFILE
+
+	translate_pkgfile_deps arch PKGFILE
 
 	{
 		echo "pkg/"
@@ -979,6 +982,279 @@ strip_dep_op() {
 	d="${d%%<=*}"
 	d="${d%%=*}"
 	echo "$d"
+}
+
+# -------------------------------------------------------------------
+# Tradução de dependências (Arch/Venom -> Void)
+# tabela: usr/share/pkgmake/pkgnames.map
+# -------------------------------------------------------------------
+declare -gA PKGMAP=()       # nome-origem -> nome-void ("-" = remover)
+declare -gA PKGMAP_MAKE=()  # nome-void -> 1 (ferramenta só de build)
+declare -gA PKGMAP_DEVEL=() # nome-void -> pacote -devel fora do padrão
+declare -gA REPO_HAS_CACHE=()
+PKGMAP_LOADED=0
+
+pkgmap_file() {
+	local bindir d
+	bindir="$(dirname "$(readlink -f "$0")")"
+	for d in "$bindir/../share/pkgmake" /usr/local/share/pkgmake /usr/share/pkgmake; do
+		if [[ -f "$d/pkgnames.map" ]]; then
+			echo "$d/pkgnames.map"
+			return 0
+		fi
+	done
+	return 1
+}
+
+load_pkgmap() {
+	local file orig void rest t
+	((PKGMAP_LOADED)) && return 0
+	file="$(pkgmap_file)" || return 1
+	while read -r orig void rest; do
+		[[ -z "$orig" || "$orig" == \#* || -z "$void" ]] && continue
+		PKGMAP["$orig"]="$void"
+		for t in $rest; do
+			case "$t" in
+			make) PKGMAP_MAKE["$void"]=1 ;;
+			devel=*) PKGMAP_DEVEL["$void"]="${t#devel=}" ;;
+			esac
+		done
+	done <"$file"
+	PKGMAP_LOADED=1
+}
+
+# pacote existe nos repositórios do Void (configurados + PKGDEST local)?
+repo_has() {
+	local n="$1" r=1
+	local opts=(-R)
+	if [[ -n "${REPO_HAS_CACHE[$n]+x}" ]]; then
+		return "${REPO_HAS_CACHE[$n]}"
+	fi
+	[[ -n "${PKGDEST:-}" && -d "$PKGDEST" ]] && opts+=(--repository="$PKGDEST")
+	xbps-query "${opts[@]}" "$n" >/dev/null 2>&1 && r=0
+	REPO_HAS_CACHE["$n"]=$r
+	return $r
+}
+
+# translate_name <origem> <nome>  -> nome no Void (vazio = remover)
+translate_name() {
+	local origin="$1" name="$2"
+	if [[ -n "${PKGMAP[$name]+x}" ]]; then
+		[[ "${PKGMAP[$name]}" == "-" ]] || echo "${PKGMAP[$name]}"
+		return 0
+	fi
+	case "$name" in
+	lib32-*) return 0 ;;
+	python-*)
+		if [[ "$origin" == arch ]]; then
+			echo "python3-${name#python-}"
+			return 0
+		fi
+		;;
+	esac
+	echo "$name"
+}
+
+# pacote -devel do Void para <nome> (vazio se não houver)
+devel_of() {
+	local n="$1"
+	if [[ -n "${PKGMAP_DEVEL[$n]+x}" ]]; then
+		echo "${PKGMAP_DEVEL[$n]}"
+	elif repo_has "$n-devel"; then
+		echo "$n-devel"
+	fi
+}
+
+# linhas inicial e final do array <var>=( ... ) no nível do arquivo
+dep_array_range() {
+	awk -v v="$2" '
+		!start && $0 ~ "^" v "=\\(" { start = NR }
+		start {
+			line = $0
+			sub(/#.*/, "", line)
+			if (index(line, ")")) { print start, NR; exit }
+		}
+	' "$1"
+}
+
+# itens do array <var> (um por linha, sem aspas e comentários)
+dep_array_items() {
+	local r s e
+	r="$(dep_array_range "$1" "$2")"
+	[[ -n "$r" ]] || return 0
+	read -r s e <<<"$r"
+	sed -n "${s},${e}p" "$1" |
+		sed -E 's/#.*$//' |
+		sed -E "1s/^$2=\\(//" |
+		sed -E '$s/\).*$//' |
+		tr -d "\"'" |
+		tr -s ' \t' '\n\n' |
+		sed '/^$/d'
+}
+
+# dep_array_write <arquivo> <var> <nota> <itens...>
+# substitui o array; se não existir, cria depois do depends (ou do pkgrel)
+dep_array_write() {
+	local f="$1" v="$2" note="$3"
+	shift 3
+	local r s e tmp after i
+	tmp="$(mktemp)"
+	{
+		[[ -n "$note" ]] && echo "$note"
+		if (($#)); then
+			echo "${v}=("
+			for i in "$@"; do
+				printf '\t%s\n' "$i"
+			done
+			echo ")"
+		else
+			echo "${v}=()"
+		fi
+	} >"$tmp.block"
+
+	r="$(dep_array_range "$f" "$v")"
+	if [[ -n "$r" ]]; then
+		read -r s e <<<"$r"
+		{
+			head -n $((s - 1)) "$f"
+			cat "$tmp.block"
+			tail -n +$((e + 1)) "$f"
+		} >"$tmp"
+	else
+		r="$(dep_array_range "$f" depends)"
+		if [[ -n "$r" ]]; then
+			read -r s after <<<"$r"
+		else
+			after="$(grep -n -m1 '^pkgrel=' "$f" | cut -d: -f1)"
+			[[ -n "$after" ]] || after="$(wc -l <"$f")"
+		fi
+		{
+			head -n "$after" "$f"
+			cat "$tmp.block"
+			tail -n +$((after + 1)) "$f"
+		} >"$tmp"
+	fi
+	cat "$tmp" >"$f"
+	rm -f "$tmp" "$tmp.block"
+}
+
+# acrescenta <valor> no array <nome> se ainda não estiver lá
+add_unique() {
+	local -n _arr="$1"
+	local x
+	for x in "${_arr[@]}"; do
+		[[ "$x" == "$2" ]] && return 0
+	done
+	_arr+=("$2")
+}
+
+# translate_pkgfile_deps <arch|venom> <PKGFILE>
+# traduz depends/makedepends para os nomes do Void (feito só na importação)
+translate_pkgfile_deps() {
+	local origin="$1" f="$2"
+	local has_xbps=0 tok name op new dv n note
+	local odeps=() omdeps=() deps=() mdeps=() missing=()
+
+	if ! load_pkgmap; then
+		warn "pkgnames.map não encontrado: depends/makedepends NÃO foram traduzidos"
+		return 0
+	fi
+	if command -v xbps-query >/dev/null 2>&1; then
+		has_xbps=1
+	else
+		warn "xbps-query não encontrado: sem -devel automático e sem conferência no repositório do Void"
+	fi
+
+	mapfile -t odeps < <(dep_array_items "$f" depends)
+	mapfile -t omdeps < <(dep_array_items "$f" makedepends)
+	((${#odeps[@]} + ${#omdeps[@]})) || return 0
+
+	msg "Traduzindo depends/makedepends ($origin -> Void)"
+
+	for tok in "${odeps[@]}"; do
+		# variáveis/expressões: mantém como está
+		if [[ "$tok" == *'$'* || "$tok" == *'('* ]]; then
+			add_unique deps "$tok"
+			continue
+		fi
+		name="${tok%%[<>=]*}"
+		op="${tok#"$name"}"
+		new="$(translate_name "$origin" "$name")"
+		[[ -n "$new" ]] || continue
+		# Venom não separa build/runtime: ferramenta de build vai para o makedepends
+		if [[ "$origin" == venom && -n "${PKGMAP_MAKE[$new]+x}" ]]; then
+			add_unique mdeps "$new$op"
+			continue
+		fi
+		add_unique deps "$new$op"
+		# biblioteca: o Void separa os headers no -devel
+		if ((has_xbps)) && [[ -z "${PKGMAP_MAKE[$new]+x}" ]]; then
+			dv="$(devel_of "$new")"
+			[[ -n "$dv" ]] && add_unique mdeps "$dv$op"
+		fi
+	done
+
+	for tok in "${omdeps[@]}"; do
+		if [[ "$tok" == *'$'* || "$tok" == *'('* ]]; then
+			add_unique mdeps "$tok"
+			continue
+		fi
+		name="${tok%%[<>=]*}"
+		op="${tok#"$name"}"
+		new="$(translate_name "$origin" "$name")"
+		[[ -n "$new" ]] || continue
+		if ((has_xbps)) && [[ -z "${PKGMAP_MAKE[$new]+x}" ]]; then
+			dv="$(devel_of "$new")"
+			[[ -n "$dv" ]] && new="$dv"
+		fi
+		add_unique mdeps "$new$op"
+	done
+
+	if [[ "${deps[*]}" != "${odeps[*]}" ]]; then
+		note=""
+		((${#odeps[@]})) && note="# NOTE: depends original ($origin): ${odeps[*]}"
+		dep_array_write "$f" depends "$note" "${deps[@]}"
+	fi
+	if [[ "${mdeps[*]}" != "${omdeps[*]}" ]]; then
+		note=""
+		((${#omdeps[@]})) && note="# NOTE: makedepends original ($origin): ${omdeps[*]}"
+		dep_array_write "$f" makedepends "$note" "${mdeps[@]}"
+	fi
+
+	if ((has_xbps)); then
+		for tok in "${deps[@]}" "${mdeps[@]}"; do
+			[[ "$tok" == *'$'* ]] && continue
+			n="$(strip_dep_op "$tok")"
+			repo_has "$n" || add_unique missing "$n"
+		done
+		if ((${#missing[@]})); then
+			warn "não encontrados nos repositórios do Void (corrija no PKGFILE ou acrescente no pkgnames.map): ${missing[*]}"
+		fi
+	fi
+}
+
+# conferência no build: só avisa, não altera nada
+check_deps_repo() {
+	local v d n
+	command -v xbps-query >/dev/null 2>&1 || return 0
+	load_pkgmap || true
+	for v in depends makedepends; do
+		local -n _deps="$v"
+		for d in "${_deps[@]}"; do
+			[[ -z "$d" || "$d" == *'$'* ]] && continue
+			n="$(strip_dep_op "$d")"
+			repo_has "$n" && continue
+			xbps-query "$n" >/dev/null 2>&1 && continue
+			if [[ -n "${PKGMAP[$n]+x}" && "${PKGMAP[$n]}" != "-" ]]; then
+				warn "$v: '$n' não existe no Void; equivalente provável: ${PKGMAP[$n]}"
+			elif [[ "${PKGMAP[$n]:-}" == "-" ]]; then
+				warn "$v: '$n' não é usado no Void; remova do PKGFILE"
+			else
+				warn "$v: '$n' não encontrado nos repositórios do Void"
+			fi
+		done
+		unset -n _deps
+	done
 }
 
 sync_deps() {
@@ -2291,6 +2567,7 @@ load_pkgfile
 sanitize_pkgfile_vars
 resolve_sources
 normalize_deps
+check_deps_repo
 normalize_dep_patterns
 resolve_fns
 validate_config # validação FINAL, com tudo resolvido

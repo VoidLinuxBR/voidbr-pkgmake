@@ -62,7 +62,7 @@ chmod +x "$TMPDIR/pkgmake"
 info "Baixando arquivos auxiliares..."
 mkdir -p "$TMPDIR/share"
 
-for f in autotools.sh cmake.sh python.sh; do
+for f in autotools.sh cmake.sh python.sh pkgnames.map; do
   $DL "$REPO_URL/usr/share/pkgmake/$f" > "$TMPDIR/share/$f"
 done
 
