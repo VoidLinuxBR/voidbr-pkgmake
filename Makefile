@@ -25,7 +25,10 @@ deps:
 	fi
 	missing=""
 	for d in $(DEPENDS); do
-		xbps-query "$$d" >/dev/null 2>&1 || missing="$$missing $$d"
+		xbps-query "$$d" >/dev/null 2>&1 && continue
+		# fornecido por outro pacote (provides), ex.: xbps do VoidBR
+		LC_ALL=C xbps-install -n "$$d" 2>&1 | grep -q "already installed" && continue
+		missing="$$missing $$d"
 	done
 	if [ -n "$$missing" ]; then
 		echo "==> Instalando dependências:$$missing"

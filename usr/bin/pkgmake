@@ -4,7 +4,7 @@
 #
 #  pkgmake — makepkg-like tool for Void XBPS
 #  Created: dom 21 dez 2025 11:47:51 -04
-#  Updated: sex 30 out 2026 00:24:03 -04
+#  Updated: sex 30 out 2026 00:45:57 -04
 #
 #  Copyright (c) 2019-2026, Vilmar Catafesta <vcatafesta@gmail.com>
 #  Assembled By Vilmar Catafesta for the ChiliLinux project.
@@ -2064,6 +2064,8 @@ sync_deps() {
 		else
 			# já instalado? pula (evita "ERROR: Package already installed")
 			xbps-query "$d" &>/dev/null && continue
+			# fornecido por outro pacote instalado (provides)
+			LC_ALL=C xbps-install -n "$d" 2>&1 | grep -q "already installed" && continue
 			clean+=("$(strip_dep_op "$d")")
 		fi
 	done
