@@ -5,7 +5,7 @@ FROM ghcr.io/void-linux/void-glibc-full:latest
 
 RUN xbps-install -Syu xbps \
 	&& xbps-install -Syu \
-	&& xbps-install -y base-devel bash git curl wget unzip fakeroot shfmt sudo shadow xz zstd ncurses \
+	&& xbps-install -y base-devel bash git curl wget unzip fakeroot shfmt sudo shadow xz zstd ncurses ncurses-devel \
 	&& rm -rf /var/cache/xbps/*
 
 # usuário de build (uid/gid ajustados no entrypoint para os do host)
