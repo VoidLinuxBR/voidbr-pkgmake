@@ -121,3 +121,64 @@ python3-wheel           python3-wheel    make
 rust                    rust             make
 cargo                   cargo            make
 go                      go               make
+
+# --- Alpine ------------------------------------------------------------
+linux-headers           kernel-libc-headers make
+xwayland                xorg-server-xwayland
+gettext-tiny            gettext          make
+bsd-compat-headers      -
+argp-standalone         -
+musl-fts                -
+musl-obstack            -
+libexecinfo             -
+abuild                  -
+
+# --- Fedora ------------------------------------------------------------
+git-core                git              make
+gcc-c++                 gcc              make
+openpgpverify           -
+systemd-rpm-macros      -
+pyproject-rpm-macros    -
+redhat-rpm-config       -
+libappstream-glib       appstream-glib
+
+# --- Debian (pacotes -dev com nome bem diferente do Void) ---------------
+libgtk-3-dev            gtk+3
+libgtk-4-dev            gtk4
+libgtk2.0-dev           gtk+
+libglib2.0-dev          glib
+zlib1g-dev              zlib
+libssl-dev              openssl
+libcurl4-openssl-dev    libcurl
+libcurl4-gnutls-dev     libcurl
+libpcre2-dev            libpcre2
+libsqlite3-dev          sqlite
+libjpeg-dev             libjpeg-turbo
+libjpeg62-turbo-dev     libjpeg-turbo
+libfreetype-dev         freetype
+libfreetype6-dev        freetype
+libpango1.0-dev         pango
+libcairo2-dev           cairo
+libgdk-pixbuf-2.0-dev   gdk-pixbuf
+libgdk-pixbuf2.0-dev    gdk-pixbuf
+libdbus-1-dev           dbus
+libwayland-dev          wayland
+libsdl2-dev             SDL2
+libboost-dev            boost
+libboost-all-dev        boost
+libsystemd-dev          -
+libudev-dev             eudev-libudev
+python3-all             python3
+python3-all-dev         python3
+pybuild-plugin-pyproject -
+quilt                   -
+ninja-build             ninja            make
+libnl-3-dev             libnl3
+libnl-genl-3-dev        libnl3
+libnl-route-3-dev       libnl3
+xtrans-dev              xtrans
+x11proto-dev            xorgproto
+xutils-dev              xorg-util-macros make
+libx11-data             -
+py3-gpep517             python3-build    make
+python3-gpep517         python3-build    make
