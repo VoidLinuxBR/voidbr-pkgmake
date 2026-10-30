@@ -165,6 +165,18 @@ pkgmake_new() {
 			MODE="venom"
 			shift
 			;;
+		--from-alpine)
+			MODE="alpine"
+			shift
+			;;
+		--from-fedora)
+			MODE="fedora"
+			shift
+			;;
+		--from-debian)
+			MODE="debian"
+			shift
+			;;
 		-*)
 			die "opção inválida: $1"
 			;;
@@ -201,6 +213,15 @@ pkgmake_new() {
 		;;
 	venom)
 		from_venom "$PKGNAME" "${DIRPKGFILE}"
+		;;
+	alpine)
+		from_alpine "$PKGNAME" "${DIRPKGFILE}"
+		;;
+	fedora)
+		from_fedora "$PKGNAME" "${DIRPKGFILE}"
+		;;
+	debian)
+		from_debian "$PKGNAME" "${DIRPKGFILE}"
 		;;
 	*)
 		die "modo interno inválido"
@@ -517,6 +538,599 @@ sh_pre_post_install() {
 		echo '  log "Finalizando upgrade"'
 		echo '}'
 	}
+}
+
+# -------------------------------------------------------------------
+# helpers comuns dos importadores (Alpine/Fedora/Debian)
+# -------------------------------------------------------------------
+import_dl() {
+	curl -fsSL --retry 2 -- "$1"
+}
+
+# gera a lista bash 'a' 'b' (aspas simples) a partir dos argumentos
+bash_list() {
+	local i out=""
+	for i in "$@"; do
+		out+="'${i//\'/\'\\\'\'}' "
+	done
+	echo "${out% }"
+}
+
+import_gitignore() {
+	{
+		echo "pkg/"
+		echo "src/"
+	} >.gitignore
+}
+
+import_finish() {
+	local dir="$1"
+	shfmt -w PKGFILE 2>/dev/null || true
+	cd - >/dev/null || true
+	msg "${dir}/PKGFILE criado com sucesso."
+	msg "Entre no diretório: ${yellow}cd $dir${rst}"
+	msg "Revisão manual obrigatória."
+}
+
+# -------------------------------------------------------------------
+# new --from-alpine <pkgname>   (ou main/pkg, community/pkg, testing/pkg)
+# Importa APKBUILD do Alpine Linux (aports, espelho do GitHub)
+# -------------------------------------------------------------------
+from_alpine() {
+	local PKGNAME="$1" DIRPKGFILE="$2"
+	local ALPINE_RAW="https://raw.githubusercontent.com/alpinelinux/aports/master"
+	local repos=(main community testing) repo pkg found="" s f
+	local TMP
+
+	if [[ "$PKGNAME" == */* ]]; then
+		repos=("${PKGNAME%%/*}")
+		pkg="${PKGNAME##*/}"
+	else
+		pkg="$PKGNAME"
+	fi
+
+	TMP="$(mktemp -d)"
+	trap 'rm -rf -- "$TMP"' EXIT
+
+	msg "Procurando APKBUILD no Alpine: $pkg"
+	for repo in "${repos[@]}"; do
+		if import_dl "$ALPINE_RAW/$repo/$pkg/APKBUILD" >"$TMP/APKBUILD" 2>/dev/null; then
+			found="$repo"
+			break
+		fi
+	done
+	[[ -n "$found" ]] || die "APKBUILD não encontrado no Alpine para '$pkg' (repos: ${repos[*]})"
+	msg "Pacote encontrado: $found/$pkg"
+
+	mkdir -p "$DIRPKGFILE"
+	cd "$DIRPKGFILE" || die "não foi possível entrar no diretório '$DIRPKGFILE'"
+
+	# lê as variáveis do APKBUILD num subshell sem rede/efeitos (só atribuições)
+	local meta
+	meta="$(
+		cd "$TMP" &&
+			env -i PATH=/usr/bin:/bin bash -c '
+				CBUILD=x CHOST=x CARCH=x CTARGET=x srcdir=/src pkgdir=/pkg startdir=/start
+				source ./APKBUILD >/dev/null 2>&1 || true
+				for v in pkgname pkgver pkgrel pkgdesc url license builddir; do
+					printf "%s=%q\n" "$v" "${!v}"
+				done
+				printf "a_depends=%q\n" "$depends"
+				printf "a_makedepends=%q\n" "$makedepends $makedepends_build $makedepends_host"
+				printf "a_source=%q\n" "$source"
+				printf "a_install=%q\n" "$install"
+			'
+	)" || die "falha ao ler o APKBUILD"
+
+	local pkgname pkgver pkgrel pkgdesc url license builddir a_depends a_makedepends a_source a_install
+	eval "$meta"
+
+	# fontes: URLs ficam no source; arquivos locais (patches etc.) são baixados
+	local srcs=() locals=() patches=()
+	for s in $a_source; do
+		if [[ "$s" == *://* ]]; then
+			srcs+=("$s")
+		else
+			f="${s##*::}"
+			if import_dl "$ALPINE_RAW/$found/$pkg/$f" >"$f" 2>/dev/null; then
+				locals+=("$f")
+				[[ "$f" == *.patch ]] && patches+=("$f")
+			else
+				rm -f "$f"
+				warn "arquivo local do APKBUILD não encontrado: $f"
+			fi
+		fi
+	done
+	# scripts de instalação do Alpine (.pre-install, .post-install...) ficam só para referência
+	for s in $a_install; do
+		import_dl "$ALPINE_RAW/$found/$pkg/$s" >"$s" 2>/dev/null || rm -f "$s"
+	done
+
+	# funções do APKBUILD (renomeadas para _alpine_*), sem as dos subpacotes
+	local fns
+	fns="$(
+		cd "$TMP" &&
+			env -i PATH=/usr/bin:/bin bash -c '
+				source ./APKBUILD >/dev/null 2>&1 || true
+				# variáveis auxiliares do APKBUILD (_commit, _pkgver...)
+				for v in $(compgen -v | grep -E "^_[A-Za-z0-9]"); do
+					printf "%s=%q\n" "$v" "${!v}"
+				done
+				echo
+				for fn in prepare build check package; do
+					declare -F "$fn" >/dev/null && declare -f "$fn" | sed "1s/^$fn /_alpine_$fn /"
+				done
+			'
+	)"
+
+	[[ -n "$builddir" && "$builddir" != "/src/" ]] || builddir="/src/$pkgname-$pkgver"
+	builddir="${builddir/#\/src/\$srcdir}"
+
+	{
+		echo "#!/usr/bin/env bash"
+		echo "# NOTE: Imported from Alpine Linux ($found/$pkg)"
+		echo "# NOTE: Source: https://gitlab.alpinelinux.org/alpine/aports/-/tree/master/$found/$pkg"
+		echo "# NOTE: This PKGFILE is PARTIAL and MUST be reviewed"
+		echo "# Maintainer: $PACKAGER"
+		echo
+		echo "pkgname=$pkgname"
+		echo "pkgver=$pkgver"
+		echo "pkgrel=$((pkgrel + 1))"
+		echo "pkgdesc=$(bash_list "$pkgdesc")"
+		echo "url=$(bash_list "$url")"
+		echo "arch=('x86_64')"
+		printf 'license=(%s)\n' "$(bash_list "$license")"
+		echo "source=($(bash_list "${srcs[@]}" "${locals[@]}"))"
+		echo "md5sums=('SKIP')"
+		[[ -n "$a_install" ]] && echo "# NOTE: Alpine install scripts (revisar e passar para pre/post_install): $a_install"
+		echo
+		echo "# ambiente esperado pelas funções do Alpine"
+		echo "CBUILD=\"\$(gcc -dumpmachine)\""
+		echo "CHOST=\"\$CBUILD\""
+		echo "CARCH=\"\$(uname -m)\""
+		echo "builddir=\"$builddir\""
+		echo
+		echo "default_prepare() {"
+		echo "	local p"
+		echo "	for p in $(bash_list "${patches[@]}"); do"
+		echo "		msg \"Aplicando patch: \$p\""
+		echo "		patch -p1 -i \"\$srcdir/\$p\""
+		echo "	done"
+		echo "}"
+		echo
+		echo "$fns"
+		echo
+		if grep -q '^_alpine_prepare ' <<<"$fns"; then
+			echo 'prepare() { cd "$builddir" && _alpine_prepare; }'
+		else
+			echo 'prepare() { cd "$builddir" && default_prepare; }'
+		fi
+		grep -q '^_alpine_build ' <<<"$fns" && echo 'build() { cd "$builddir" && _alpine_build; }'
+		grep -q '^_alpine_package ' <<<"$fns" && echo 'package() { cd "$builddir" && _alpine_package; }'
+		echo
+		sh_pre_post_install
+	} >PKGFILE
+
+	mapfile -t IN_DEPS < <(tr -s ' \t' '\n\n' <<<"$a_depends" | sed '/^$/d')
+	mapfile -t IN_MDEPS < <(tr -s ' \t' '\n\n' <<<"$a_makedepends" | sed '/^$/d')
+	write_translated_deps alpine PKGFILE
+	import_gitignore
+	import_finish "$DIRPKGFILE"
+}
+
+# -------------------------------------------------------------------
+# new --from-fedora <pkgname>
+# Importa o .spec do Fedora (src.fedoraproject.org, rawhide)
+# -------------------------------------------------------------------
+
+# expande macros %{...} conhecidas de uma linha do .spec
+fedora_expand() {
+	local l="$1" k
+	for k in "${!FEDORA_MACROS[@]}"; do
+		l="${l//"%{$k}"/"${FEDORA_MACROS[$k]}"}"
+		l="${l//"%{?$k}"/"${FEDORA_MACROS[$k]}"}"
+		l="${l//"%$k"/"${FEDORA_MACROS[$k]}"}"
+	done
+	l="${l//"%{?dist}"/}"
+	echo "$l"
+}
+
+# converte uma linha de %build/%install para shell
+FEDORA_SUBST=(
+	'%{buildroot}' '$pkgdir'
+	'$RPM_BUILD_ROOT' '$pkgdir'
+	'%{_prefix}' '/usr'
+	'%{_bindir}' '/usr/bin'
+	'%{_sbindir}' '/usr/bin'
+	'%{_libdir}' '/usr/lib'
+	'%{_libexecdir}' '/usr/libexec'
+	'%{_includedir}' '/usr/include'
+	'%{_datadir}' '/usr/share'
+	'%{_mandir}' '/usr/share/man'
+	'%{_infodir}' '/usr/share/info'
+	'%{_docdir}' '/usr/share/doc'
+	'%{_sysconfdir}' '/etc'
+	'%{_localstatedir}' '/var'
+	'%{_unitdir}' '/usr/lib/systemd/system'
+	'%{_smp_mflags}' '-j$(nproc)'
+	'%{optflags}' '$CFLAGS'
+	'%{build_ldflags}' '$LDFLAGS'
+	'%{__python3}' 'python3'
+	'%{python3}' 'python3'
+	'%{__make}' 'make'
+	'%{__cmake}' 'cmake'
+	'%configure' './configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var --mandir=/usr/share/man --infodir=/usr/share/info'
+	'%make_build' 'make -j$(nproc)'
+	'%make_install' 'make install DESTDIR="$pkgdir"'
+	'%cmake_build' 'cmake --build build'
+	'%cmake_install' 'DESTDIR="$pkgdir" cmake --install build'
+	'%cmake' 'cmake -B build -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release'
+	'%meson_build' 'meson compile -C build'
+	'%meson_install' 'DESTDIR="$pkgdir" meson install -C build'
+	'%meson' 'meson setup build --prefix=/usr --buildtype=release'
+	'%pyproject_wheel' 'python3 -m build --wheel --no-isolation'
+	'%pyproject_install' 'python3 -m installer --destdir="$pkgdir" dist/*.whl'
+	'%py3_build' 'python3 setup.py build'
+	'%py3_install' 'python3 setup.py install --root="$pkgdir" --optimize=1'
+)
+
+fedora_shell_line() {
+	local l a b i pat
+	l="$(fedora_expand "$1")"
+	for ((i = 0; i < ${#FEDORA_SUBST[@]}; i += 2)); do
+		a="${FEDORA_SUBST[i]}"
+		b="${FEDORA_SUBST[i + 1]}"
+		l="${l//"$a"/"$b"}"
+	done
+	# %global _configure ../configure (build fora da árvore)
+	[[ -n "${FEDORA_MACROS[_configure]:-}" ]] && l="${l//"./configure --prefix"/"${FEDORA_MACROS[_configure]} --prefix"}"
+	# %{SOURCEn} -> arquivo copiado para o srcdir
+	while [[ "$l" =~ %\{?SOURCE([0-9]+)\}? ]]; do
+		pat="${BASH_REMATCH[0]}"
+		b="\$srcdir/${FEDORA_SRC[${BASH_REMATCH[1]}]##*/}"
+		l="${l//"$pat"/"$b"}"
+	done
+
+	case "$l" in
+	%find_lang* | %pyproject_save_files* | %ldconfig* | %set_build_flags* | %py3_shebang_fix* | %\{?ldconfig*)
+		echo "	# $l"
+		return 0
+		;;
+	%if* | %else* | %endif* | %global* | %define* | %bcond*)
+		echo "	# NOTE(revisar): $l"
+		return 0
+		;;
+	esac
+	if [[ "$l" =~ %[a-zA-Z_{] ]]; then
+		echo "	# NOTE(revisar macro): $l"
+		return 0
+	fi
+	echo "	$l"
+}
+
+from_fedora() {
+	local PKGNAME="$1" DIRPKGFILE="$2"
+	local REPO_URL="https://src.fedoraproject.org/rpms/${PKGNAME}.git"
+	local spec line tag val section="" k n sub
+	local name="" version="" release="" summary="" license="" url="" setupdir=""
+	local deps=() mdeps=() patches=() srcs=() locals=() buildl=() installl=() prepl=() toks=()
+	declare -gA FEDORA_MACROS=() FEDORA_SRC=()
+
+	git ls-remote --exit-code "$REPO_URL" &>/dev/null ||
+		die "pacote '$PKGNAME' não encontrado no Fedora ($REPO_URL)"
+
+	cmd_run git clone --depth=1 "$REPO_URL" "$DIRPKGFILE" ||
+		die "erro ao clonar '$PKGNAME' do Fedora"
+	cd "$DIRPKGFILE" || die "não foi possível entrar no diretório '$DIRPKGFILE'"
+	rm -rf .git
+	spec="${PKGNAME}.spec"
+	[[ -f "$spec" ]] || spec="$(ls ./*.spec 2>/dev/null | head -n1)"
+	[[ -f "$spec" ]] || die ".spec não encontrado"
+
+	# %global/%define simples (nome valor)
+	while read -r tag k val; do
+		[[ -n "$k" && -n "$val" && "$val" != *%\(* ]] || continue
+		FEDORA_MACROS["$k"]="$val"
+	done < <(grep -E '^%(global|define)[[:space:]]' "$spec")
+
+	sub=0 # dentro de %package de subpacote
+	while IFS= read -r line || [[ -n "$line" ]]; do
+		case "$line" in
+		%package*) sub=1 section="" ; continue ;;
+		%description* | %files* | %changelog* | %pre* | %post* | %check* | %preun* | %postun* | %posttrans*)
+			section="skip"
+			continue
+			;;
+		%prep*) section="prep" ; continue ;;
+		%build*) section="build" ; continue ;;
+		%install*) section="install" ; continue ;;
+		esac
+
+		case "$section" in
+		build) buildl+=("$line"); continue ;;
+		install) installl+=("$line"); continue ;;
+		prep)
+			if [[ "$line" =~ ^%(autosetup|setup).*-n[[:space:]]+([^[:space:]]+) ]]; then
+				setupdir="${BASH_REMATCH[2]}"
+			elif [[ "$line" != %autosetup* && "$line" != %setup* && "$line" != %autopatch* && "$line" != %patch* ]]; then
+				prepl+=("$line")
+			fi
+			continue
+			;;
+		skip) continue ;;
+		esac
+
+		# Requires(post) etc. são dos scriptlets do rpm
+		[[ "$line" =~ ^Requires\( ]] && continue
+		[[ "$line" =~ ^([A-Za-z]+[0-9]*):[[:space:]]*(.*)$ ]] || continue
+		tag="${BASH_REMATCH[1]}"
+		val="$(fedora_expand "${BASH_REMATCH[2]}")"
+		case "$tag" in
+		Name) name="$val"; FEDORA_MACROS[name]="$val" ;;
+		Version) version="$val"; FEDORA_MACROS[version]="$val" ;;
+		Release) release="${val%%%*}"; release="${release%%.*}" ;;
+		Summary) ((sub)) || summary="$val" ;;
+		License) ((sub)) || license="$val" ;;
+		URL) url="$val"; FEDORA_MACROS[url]="$val" ;;
+		Source*)
+			n="${tag#Source}"
+			n="${n:-0}"
+			FEDORA_SRC["$n"]="$val"
+			if [[ "$val" == *://* ]]; then
+				srcs+=("$val")
+			elif [[ -f "${val##*/}" ]]; then
+				locals+=("${val##*/}")
+			fi
+			;;
+		Patch*)
+			if [[ "$val" == *://* ]]; then
+				srcs+=("$val")
+				patches+=("${val##*/}")
+			elif [[ -f "${val##*/}" ]]; then
+				locals+=("${val##*/}")
+				patches+=("${val##*/}")
+			fi
+			;;
+		BuildRequires)
+			read -r -a toks <<<"$(echo "$val" | sed -E 's/[[:space:]]*(>=|<=|=|>|<)[[:space:]]*/\1/g; s/,/ /g')"
+			mdeps+=("${toks[@]}")
+			;;
+		Requires)
+			((sub)) && continue
+			read -r -a toks <<<"$(echo "$val" | sed -E 's/[[:space:]]*(>=|<=|=|>|<)[[:space:]]*/\1/g; s/,/ /g')"
+			deps+=("${toks[@]}")
+			;;
+		esac
+	done <"$spec"
+
+	[[ -n "$name" && -n "$version" ]] || die "não consegui ler Name/Version do .spec"
+	# Requires do próprio pacote (ex.: nano = %{version}) não fazem sentido aqui
+	local d clean=()
+	for d in "${deps[@]}"; do
+		[[ "$d" == "$name"* || "$d" == *%* ]] && continue
+		clean+=("$d")
+	done
+	deps=("${clean[@]}")
+	clean=()
+	for d in "${mdeps[@]}"; do
+		[[ "$d" == *%* ]] && continue
+		clean+=("$d")
+	done
+	mdeps=("${clean[@]}")
+
+	[[ -n "$setupdir" ]] || setupdir="$name-$version"
+	setupdir="$(fedora_expand "$setupdir")"
+
+	{
+		echo "#!/usr/bin/env bash"
+		echo "# NOTE: Imported from Fedora ($PKGNAME.spec, rawhide)"
+		echo "# NOTE: Source: https://src.fedoraproject.org/rpms/$PKGNAME"
+		echo "# NOTE: This PKGFILE is PARTIAL and MUST be reviewed (o .spec original fica ao lado)"
+		echo "# Maintainer: $PACKAGER"
+		echo
+		echo "pkgname=$name"
+		echo "pkgver=$version"
+		echo "pkgrel=${release:-1}"
+		echo "pkgdesc=$(bash_list "$summary")"
+		echo "url=$(bash_list "$url")"
+		echo "arch=('x86_64')"
+		echo "license=($(bash_list "$license"))"
+		echo "source=($(bash_list "${srcs[@]}" "${locals[@]}"))"
+		echo "md5sums=('SKIP')"
+		echo
+		echo "prepare() {"
+		echo "	cd \"\$srcdir/$setupdir\""
+		echo "	local p"
+		echo "	for p in $(bash_list "${patches[@]}"); do"
+		echo "		msg \"Aplicando patch: \$p\""
+		echo "		patch -p1 -i \"\$srcdir/\$p\""
+		echo "	done"
+		for line in "${prepl[@]}"; do
+			[[ -n "$line" && "$line" != \#* ]] && fedora_shell_line "$line"
+		done
+		echo "}"
+		echo
+		echo "build() {"
+		echo "	cd \"\$srcdir/$setupdir\""
+		for line in "${buildl[@]}"; do
+			[[ -n "$line" ]] && fedora_shell_line "$line"
+		done
+		echo "}"
+		echo
+		echo "package() {"
+		echo "	cd \"\$srcdir/$setupdir\""
+		for line in "${installl[@]}"; do
+			[[ -n "$line" ]] && fedora_shell_line "$line"
+		done
+		echo "}"
+		echo
+		sh_pre_post_install
+	} >PKGFILE
+
+	IN_DEPS=("${deps[@]}")
+	IN_MDEPS=("${mdeps[@]}")
+	write_translated_deps fedora PKGFILE
+	import_gitignore
+	import_finish "$DIRPKGFILE"
+}
+
+# -------------------------------------------------------------------
+# new --from-debian <pkgname>
+# Importa o pacote fonte do Debian (sid) via sources.debian.org
+# -------------------------------------------------------------------
+
+# Build-Depends/Depends do debian/control -> tokens "nome>=versão"
+debian_dep_tokens() {
+	# junta continuações, tira alternativas (fica a 1ª), arch/profile e substvars
+	tr '\n' ' ' |
+		tr ',' '\n' |
+		sed -E 's/\|.*$//; s/\[[^]]*\]//g; s/<[^>]*>//g; s/\$\{[^}]*\}//g; s/:any|:native//g' |
+		sed -E 's/\(([<>=]+)[[:space:]]*([^)]*)\)/\1\2/; s/<</</; s/>>/>/' |
+		tr -d ' \t' |
+		sed '/^$/d'
+}
+
+from_debian() {
+	local PKGNAME="$1" DIRPKGFILE="$2"
+	local API="https://sources.debian.org" POOL="https://deb.debian.org/debian/pool/main"
+	local json ver upver prefix data dsc f p style="autotools"
+	local srcs=() patches=() bdeps=() rdeps=()
+
+	command -v jq >/dev/null 2>&1 || die "jq necessário para importar do Debian"
+
+	msg "Procurando pacote fonte no Debian: $PKGNAME"
+	json="$(import_dl "$API/api/src/$PKGNAME/")" || die "falha ao consultar sources.debian.org"
+	ver="$(jq -r '.versions[0].version // empty' <<<"$json")"
+	[[ -n "$ver" ]] || die "pacote fonte '$PKGNAME' não encontrado no Debian"
+	msg "Versão: $ver"
+
+	data="$API/data/main/${PKGNAME:0:1}/$PKGNAME/$ver"
+	prefix="${PKGNAME:0:1}"
+	[[ "$PKGNAME" == lib* ]] && {
+		prefix="${PKGNAME:0:4}"
+		data="$API/data/main/$prefix/$PKGNAME/$ver"
+	}
+
+	mkdir -p "$DIRPKGFILE/debian"
+	cd "$DIRPKGFILE" || die "não foi possível entrar no diretório '$DIRPKGFILE'"
+
+	import_dl "$data/debian/control" >debian/control || die "debian/control não encontrado"
+	import_dl "$data/debian/rules" >debian/rules 2>/dev/null || rm -f debian/rules
+
+	# patches (quilt): debian/patches/series
+	if import_dl "$data/debian/patches/series" >debian/series 2>/dev/null; then
+		while read -r p _; do
+			[[ -z "$p" || "$p" == \#* ]] && continue
+			f="${p##*/}"
+			if import_dl "$data/debian/patches/$p" >"$f" 2>/dev/null; then
+				patches+=("$f")
+			else
+				rm -f "$f"
+				warn "patch do Debian não encontrado: $p"
+			fi
+		done <debian/series
+	else
+		rm -f debian/series
+	fi
+
+	# tarball original: lido do .dsc
+	upver="${ver#*:}"
+	dsc="$(import_dl "$POOL/$prefix/$PKGNAME/${PKGNAME}_${upver}.dsc" 2>/dev/null || true)"
+	f="$(sed -n '/^Files:/,/^[^ ]/p' <<<"$dsc" | awk '{print $3}' | grep -E '\.orig\.tar\.[a-z0-9]+$|^[^_]+_[^-]+\.tar\.[a-z0-9]+$' | head -n1)"
+	if [[ -n "$f" ]]; then
+		srcs+=("$POOL/$prefix/$PKGNAME/$f")
+	else
+		warn "tarball original não encontrado no .dsc; ajuste o source manualmente"
+	fi
+	upver="${upver%-*}"
+	upver="${upver%%+dfsg*}"
+	upver="${upver%%+ds*}"
+
+	# dependências: Build-Depends do fonte e Depends do 1º pacote binário
+	mapfile -t bdeps < <(
+		awk '/^Build-Depends(-Arch|-Indep)?:/ {p=1; sub(/^[^:]*:/, ""); print; next}
+		     p && /^[ \t]/ {print; next} {p=0}' debian/control | debian_dep_tokens
+	)
+	mapfile -t rdeps < <(
+		awk '/^Package:/ {n++} n==1 && /^Depends:/ {p=1; sub(/^[^:]*:/, ""); print; next}
+		     p && /^[ \t]/ {print; next} {p=0}' debian/control | debian_dep_tokens
+	)
+
+	# estilo de build pelo Build-Depends
+	if printf '%s\n' "${bdeps[@]}" | grep -qE '^(meson|dh-sequence-meson)'; then
+		style="meson"
+	elif printf '%s\n' "${bdeps[@]}" | grep -qE '^cmake'; then
+		style="cmake"
+	elif printf '%s\n' "${bdeps[@]}" | grep -qE '^(dh-python|dh-sequence-python3|python3-setuptools|pybuild-plugin-pyproject)'; then
+		style="python"
+	fi
+
+	local desc homepage
+	desc="$(awk '/^Package:/ {n++} n==1 && /^Description:/ {sub(/^Description:[ \t]*/, ""); print; exit}' debian/control)"
+	homepage="$(awk '/^Homepage:/ {sub(/^Homepage:[ \t]*/, ""); print; exit}' debian/control)"
+
+	{
+		echo "#!/usr/bin/env bash"
+		echo "# NOTE: Imported from Debian ($PKGNAME $ver, sid)"
+		echo "# NOTE: Source: https://sources.debian.org/src/$PKGNAME/$ver/"
+		echo "# NOTE: This PKGFILE is PARTIAL and MUST be reviewed"
+		echo "# NOTE: o Debian calcula boa parte do depends no build (\${shlibs:Depends}); confira o depends"
+		echo "# NOTE: debian/rules e debian/control ficam em ./debian para referência (build_style detectado: $style)"
+		echo "# Maintainer: $PACKAGER"
+		echo
+		echo "pkgname=$PKGNAME"
+		echo "pkgver=$upver"
+		echo "pkgrel=1"
+		echo "pkgdesc=$(bash_list "$desc")"
+		echo "url=$(bash_list "$homepage")"
+		echo "arch=('x86_64')"
+		echo "license=('custom')"
+		echo "source=($(bash_list "${srcs[@]}" "${patches[@]}"))"
+		echo "md5sums=('SKIP')"
+		echo
+		echo "_builddir() { cd \"\$srcdir/$PKGNAME-$upver\" 2>/dev/null || cd \"\$srcdir\"/*/; }"
+		echo
+		echo "prepare() {"
+		echo "	_builddir"
+		echo "	local p"
+		echo "	for p in $(bash_list "${patches[@]}"); do"
+		echo "		msg \"Aplicando patch: \$p\""
+		echo "		patch -p1 -i \"\$srcdir/\$p\""
+		echo "	done"
+		echo "}"
+		echo
+		case "$style" in
+		meson)
+			echo 'build() { _builddir; meson setup build --prefix=/usr --buildtype=release; meson compile -C build; }'
+			echo 'package() { _builddir; DESTDIR="$pkgdir" meson install -C build; }'
+			;;
+		cmake)
+			echo 'build() { _builddir; cmake -B build -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release; cmake --build build; }'
+			echo 'package() { _builddir; DESTDIR="$pkgdir" cmake --install build; }'
+			;;
+		python)
+			echo 'build() { _builddir; python3 -m build --wheel --no-isolation; }'
+			echo 'package() { _builddir; python3 -m installer --destdir="$pkgdir" dist/*.whl; }'
+			;;
+		*)
+			echo 'build() {'
+			echo '	_builddir'
+			echo '	[ -x configure ] || autoreconf -fi'
+			echo '	./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var --mandir=/usr/share/man --infodir=/usr/share/info'
+			echo '	make'
+			echo '}'
+			echo 'package() { _builddir; make DESTDIR="$pkgdir" install; }'
+			;;
+		esac
+		echo
+		sh_pre_post_install
+	} >PKGFILE
+
+	IN_DEPS=("${rdeps[@]}")
+	IN_MDEPS=("${bdeps[@]}")
+	write_translated_deps debian PKGFILE
+	import_gitignore
+	import_finish "$DIRPKGFILE"
 }
 
 # -------------------------------------------------------------------
@@ -1044,15 +1658,131 @@ translate_name() {
 		return 0
 	fi
 	case "$name" in
-	lib32-*) return 0 ;;
+	lib32-* | dh-* | debhelper*) return 0 ;;
 	python-*)
 		if [[ "$origin" == arch ]]; then
 			echo "python3-${name#python-}"
 			return 0
 		fi
 		;;
+	py3-*)
+		echo "python3-${name#py3-}"
+		return 0
+		;;
 	esac
 	echo "$name"
+}
+
+# pacote do Void que fornece um arquivo (usa o xlocate, se existir)
+# file_owner <padrão> -> nome do pacote (vazio se não achar)
+file_owner() {
+	local line pkgver
+	command -v xlocate >/dev/null 2>&1 || return 0
+	line="$(xlocate "$1" 2>/dev/null | head -n1)"
+	[[ -n "$line" ]] || return 0
+	pkgver="${line%%[[:space:]]*}"
+	echo "${pkgver%-*}"
+}
+
+# Debian: libfoo2-dev, libfoo-dev... tenta achar o nome do Void
+debian_guess() {
+	local n="$1" c
+	for c in "$n" "${n#lib}" "${n%%[0-9.]*}" "$(echo "${n#lib}" | sed -E 's/[0-9.]+$//')" "$(echo "$n" | sed -E 's/-?[0-9.]+$//')"; do
+		[[ -n "$c" ]] || continue
+		if repo_has "$c" || repo_has "$c-devel"; then
+			echo "$c"
+			return 0
+		fi
+	done
+	echo "$n"
+}
+
+# map_dep <origem> <token>
+# resultado em MAP_NAME (nome no Void, vazio = remover), MAP_OP (versão)
+# e MAP_ISDEV=1 quando a origem pede os headers (-dev/-devel/pkgconfig())
+map_dep() {
+	local origin="$1" tok="$2" name inner owner
+	MAP_NAME="" MAP_OP="" MAP_ISDEV=0
+	name="${tok%%[<>=]*}"
+	MAP_OP="${tok#"$name"}"
+
+	# dependências virtuais (Fedora/Alpine)
+	case "$name" in
+	pkgconfig\(*\) | pc:*)
+		inner="${name#pkgconfig(}"
+		inner="${inner%)}"
+		inner="${inner#pc:}"
+		owner="$(file_owner "/usr/*/pkgconfig/${inner}.pc")"
+		MAP_ISDEV=1
+		if [[ -n "$owner" ]]; then
+			MAP_NAME="$owner"
+		elif repo_has "${inner}-devel"; then
+			MAP_NAME="${inner}"
+		else
+			MAP_NAME="?pkgconfig:${inner}"
+		fi
+		return 0
+		;;
+	cmake\(*\))
+		inner="${name#cmake(}"
+		inner="${inner%)}"
+		owner="$(file_owner "/usr/*/cmake/*/${inner}Config.cmake")"
+		[[ -n "$owner" ]] || owner="$(file_owner "/usr/*/cmake/*/${inner,,}-config.cmake")"
+		MAP_ISDEV=1
+		MAP_NAME="${owner:-?cmake:${inner}}"
+		return 0
+		;;
+	perl\(*\))
+		inner="${name#perl(}"
+		inner="${inner%)}"
+		MAP_NAME="perl-${inner//::/-}"
+		return 0
+		;;
+	python3dist\(*\) | python3.*dist\(*\))
+		inner="${name#*dist(}"
+		inner="${inner%)}"
+		MAP_NAME="python3-${inner}"
+		return 0
+		;;
+	so:* | cmd:* | /*)
+		inner="${name#so:}"
+		inner="${inner#cmd:}"
+		[[ "$name" == cmd:* ]] && inner="/usr/bin/$inner"
+		[[ "$name" == so:* ]] && inner="/usr/lib/$inner"
+		owner="$(file_owner "$inner")"
+		MAP_NAME="${owner:-?file:${name}}"
+		return 0
+		;;
+	esac
+
+	case "$origin" in
+	alpine | debian)
+		if [[ "$name" == *-dev ]]; then
+			MAP_ISDEV=1
+			if [[ -n "${PKGMAP[$name]+x}" ]]; then
+				MAP_NAME="$(translate_name "$origin" "$name")"
+				return 0
+			fi
+			name="${name%-dev}"
+		fi
+		;;
+	fedora)
+		if [[ "$name" == *-devel ]]; then
+			MAP_ISDEV=1
+			if [[ -n "${PKGMAP[$name]+x}" ]]; then
+				MAP_NAME="$(translate_name "$origin" "$name")"
+				return 0
+			fi
+			name="${name%-devel}"
+		fi
+		;;
+	esac
+
+	MAP_NAME="$(translate_name "$origin" "$name")"
+	if [[ "$origin" == debian && -n "$MAP_NAME" && "$MAP_NAME" == "$name" ]] &&
+		command -v xbps-query >/dev/null 2>&1 && ! repo_has "$MAP_NAME"; then
+		MAP_NAME="$(debian_guess "$MAP_NAME")"
+	fi
 }
 
 # pacote -devel do Void para <nome> (vazio se não houver)
@@ -1060,6 +1790,8 @@ devel_of() {
 	local n="$1"
 	if [[ -n "${PKGMAP_DEVEL[$n]+x}" ]]; then
 		echo "${PKGMAP_DEVEL[$n]}"
+	elif [[ "$n" == *-devel ]]; then
+		echo "$n"
 	elif repo_has "$n-devel"; then
 		echo "$n-devel"
 	fi
@@ -1104,7 +1836,11 @@ dep_array_write() {
 		if (($#)); then
 			echo "${v}=("
 			for i in "$@"; do
-				printf '\t%s\n' "$i"
+				if [[ "$i" == *'$'* ]]; then
+					printf '\t"%s"\n' "$i"
+				else
+					printf "\t'%s'\n" "$i"
+				fi
 			done
 			echo ")"
 		else
@@ -1148,89 +1884,140 @@ add_unique() {
 	_arr+=("$2")
 }
 
-# translate_pkgfile_deps <arch|venom> <PKGFILE>
-# traduz depends/makedepends para os nomes do Void (feito só na importação)
+# translate_deps_core <origem>
+# entrada: IN_DEPS / IN_MDEPS   saída: OUT_DEPS / OUT_MDEPS / OUT_MISSING
+translate_deps_core() {
+	local origin="$1" has_xbps=0 tok new dv n
+	OUT_DEPS=() OUT_MDEPS=() OUT_MISSING=()
+	command -v xbps-query >/dev/null 2>&1 && has_xbps=1
+
+	for tok in "${IN_DEPS[@]}"; do
+		# variáveis/expressões: mantém como está
+		if [[ "$tok" == *'$'* ]]; then
+			add_unique OUT_DEPS "$tok"
+			continue
+		fi
+		map_dep "$origin" "$tok"
+		new="$MAP_NAME"
+		[[ -n "$new" ]] || continue
+		if [[ "$new" == \?* ]]; then
+			add_unique OUT_MISSING "${new#\?}"
+			continue
+		fi
+		# pediu headers no depends: vai para o makedepends
+		if ((MAP_ISDEV)); then
+			dv="$(devel_of "$new")"
+			# sem -devel no Void: headers/dados ficam no próprio pacote
+			[[ -z "$dv" ]] && { ((has_xbps)) && dv="$new" || dv="$new-devel"; }
+			add_unique OUT_MDEPS "$dv$MAP_OP"
+			continue
+		fi
+		# Venom/Debian não separam bem build/runtime: ferramenta de build vai para o makedepends
+		if [[ "$origin" == venom && -n "${PKGMAP_MAKE[$new]+x}" ]]; then
+			add_unique OUT_MDEPS "$new$MAP_OP"
+			continue
+		fi
+		add_unique OUT_DEPS "$new$MAP_OP"
+		# Arch/Venom: biblioteca no depends também precisa do -devel para o build
+		if ((has_xbps)) && [[ "$origin" == arch || "$origin" == venom ]] && [[ -z "${PKGMAP_MAKE[$new]+x}" ]]; then
+			dv="$(devel_of "$new")"
+			[[ -n "$dv" ]] && add_unique OUT_MDEPS "$dv$MAP_OP"
+		fi
+	done
+
+	for tok in "${IN_MDEPS[@]}"; do
+		if [[ "$tok" == *'$'* ]]; then
+			add_unique OUT_MDEPS "$tok"
+			continue
+		fi
+		map_dep "$origin" "$tok"
+		new="$MAP_NAME"
+		[[ -n "$new" ]] || continue
+		if [[ "$new" == \?* ]]; then
+			add_unique OUT_MISSING "${new#\?}"
+			continue
+		fi
+		if ((MAP_ISDEV)); then
+			dv="$(devel_of "$new")"
+			[[ -z "$dv" ]] && { ((has_xbps)) && dv="$new" || dv="$new-devel"; }
+			new="$dv"
+		elif ((has_xbps)) && [[ "$origin" == arch || "$origin" == venom ]] && [[ -z "${PKGMAP_MAKE[$new]+x}" ]]; then
+			# Arch/Venom: os headers vêm no pacote principal; no Void ficam no -devel
+			dv="$(devel_of "$new")"
+			[[ -n "$dv" ]] && new="$dv"
+		fi
+		add_unique OUT_MDEPS "$new$MAP_OP"
+	done
+
+	if ((has_xbps)); then
+		for tok in "${OUT_DEPS[@]}" "${OUT_MDEPS[@]}"; do
+			[[ "$tok" == *'$'* ]] && continue
+			n="$(strip_dep_op "$tok")"
+			repo_has "$n" || add_unique OUT_MISSING "$n"
+		done
+	fi
+}
+
+# translate_pkgfile_deps <origem> <PKGFILE>
+# traduz depends/makedepends de um PKGFILE já escrito (feito só na importação)
 translate_pkgfile_deps() {
-	local origin="$1" f="$2"
-	local has_xbps=0 tok name op new dv n note
-	local odeps=() omdeps=() deps=() mdeps=() missing=()
+	local origin="$1" f="$2" note
+	local odeps=() omdeps=()
 
 	if ! load_pkgmap; then
 		warn "pkgnames.map não encontrado: depends/makedepends NÃO foram traduzidos"
 		return 0
 	fi
-	if command -v xbps-query >/dev/null 2>&1; then
-		has_xbps=1
-	else
+	command -v xbps-query >/dev/null 2>&1 ||
 		warn "xbps-query não encontrado: sem -devel automático e sem conferência no repositório do Void"
-	fi
 
 	mapfile -t odeps < <(dep_array_items "$f" depends)
 	mapfile -t omdeps < <(dep_array_items "$f" makedepends)
 	((${#odeps[@]} + ${#omdeps[@]})) || return 0
 
 	msg "Traduzindo depends/makedepends ($origin -> Void)"
+	IN_DEPS=("${odeps[@]}")
+	IN_MDEPS=("${omdeps[@]}")
+	translate_deps_core "$origin"
 
-	for tok in "${odeps[@]}"; do
-		# variáveis/expressões: mantém como está
-		if [[ "$tok" == *'$'* || "$tok" == *'('* ]]; then
-			add_unique deps "$tok"
-			continue
-		fi
-		name="${tok%%[<>=]*}"
-		op="${tok#"$name"}"
-		new="$(translate_name "$origin" "$name")"
-		[[ -n "$new" ]] || continue
-		# Venom não separa build/runtime: ferramenta de build vai para o makedepends
-		if [[ "$origin" == venom && -n "${PKGMAP_MAKE[$new]+x}" ]]; then
-			add_unique mdeps "$new$op"
-			continue
-		fi
-		add_unique deps "$new$op"
-		# biblioteca: o Void separa os headers no -devel
-		if ((has_xbps)) && [[ -z "${PKGMAP_MAKE[$new]+x}" ]]; then
-			dv="$(devel_of "$new")"
-			[[ -n "$dv" ]] && add_unique mdeps "$dv$op"
-		fi
-	done
-
-	for tok in "${omdeps[@]}"; do
-		if [[ "$tok" == *'$'* || "$tok" == *'('* ]]; then
-			add_unique mdeps "$tok"
-			continue
-		fi
-		name="${tok%%[<>=]*}"
-		op="${tok#"$name"}"
-		new="$(translate_name "$origin" "$name")"
-		[[ -n "$new" ]] || continue
-		if ((has_xbps)) && [[ -z "${PKGMAP_MAKE[$new]+x}" ]]; then
-			dv="$(devel_of "$new")"
-			[[ -n "$dv" ]] && new="$dv"
-		fi
-		add_unique mdeps "$new$op"
-	done
-
-	if [[ "${deps[*]}" != "${odeps[*]}" ]]; then
+	if [[ "${OUT_DEPS[*]}" != "${odeps[*]}" ]]; then
 		note=""
 		((${#odeps[@]})) && note="# NOTE: depends original ($origin): ${odeps[*]}"
-		dep_array_write "$f" depends "$note" "${deps[@]}"
+		dep_array_write "$f" depends "$note" "${OUT_DEPS[@]}"
 	fi
-	if [[ "${mdeps[*]}" != "${omdeps[*]}" ]]; then
+	if [[ "${OUT_MDEPS[*]}" != "${omdeps[*]}" ]]; then
 		note=""
 		((${#omdeps[@]})) && note="# NOTE: makedepends original ($origin): ${omdeps[*]}"
-		dep_array_write "$f" makedepends "$note" "${mdeps[@]}"
+		dep_array_write "$f" makedepends "$note" "${OUT_MDEPS[@]}"
 	fi
+	report_missing_deps
+}
 
-	if ((has_xbps)); then
-		for tok in "${deps[@]}" "${mdeps[@]}"; do
-			[[ "$tok" == *'$'* ]] && continue
-			n="$(strip_dep_op "$tok")"
-			repo_has "$n" || add_unique missing "$n"
-		done
-		if ((${#missing[@]})); then
-			warn "não encontrados nos repositórios do Void (corrija no PKGFILE ou acrescente no pkgnames.map): ${missing[*]}"
-		fi
+report_missing_deps() {
+	((${#OUT_MISSING[@]})) || return 0
+	warn "não encontrados nos repositórios do Void (corrija no PKGFILE ou acrescente no pkgnames.map): ${OUT_MISSING[*]}"
+}
+
+# escreve depends/makedepends traduzidos num PKGFILE gerado do zero
+# write_translated_deps <origem> <PKGFILE>   (usa IN_DEPS/IN_MDEPS)
+write_translated_deps() {
+	local origin="$1" f="$2" note
+	if ! load_pkgmap; then
+		warn "pkgnames.map não encontrado: depends/makedepends NÃO foram traduzidos"
+		OUT_DEPS=("${IN_DEPS[@]}") OUT_MDEPS=("${IN_MDEPS[@]}") OUT_MISSING=()
+	else
+		command -v xbps-query >/dev/null 2>&1 ||
+			warn "xbps-query não encontrado: sem -devel automático e sem conferência no repositório do Void"
+		msg "Traduzindo depends/makedepends ($origin -> Void)"
+		translate_deps_core "$origin"
 	fi
+	note=""
+	((${#IN_DEPS[@]})) && note="# NOTE: depends original ($origin): ${IN_DEPS[*]}"
+	dep_array_write "$f" depends "$note" "${OUT_DEPS[@]}"
+	note=""
+	((${#IN_MDEPS[@]})) && note="# NOTE: makedepends original ($origin): ${IN_MDEPS[*]}"
+	dep_array_write "$f" makedepends "$note" "${OUT_MDEPS[@]}"
+	report_missing_deps
 }
 
 # conferência no build: só avisa, não altera nada
@@ -1898,7 +2685,8 @@ run_all() {
 			msg "Reinstall with: ${yellow}sudo /usr/bin/xbps-install -R ${PKGMAKE_HOST_PKGDEST:-$PKGDEST} -S -f $pkgname${rst}"
 		else
 			cmd_run sudo xbps-install --dry-run -R "$PKGDEST" -S "$pkgname"
-			msg "Install with: ${yellow}sudo /usr/bin/xbps-install -R ${PKGMAKE_HOST_PKGDEST:-$PKGDEST} -S $pkgname${rst}"
+			msg "Install with #1: ${yellow}sudo /usr/bin/xbps-install -R ${PKGMAKE_HOST_PKGDEST:-$PKGDEST} $pkgname${rst}"
+			msg "Install with #2: ${yellow}vinstall -R ${PKGMAKE_HOST_PKGDEST:-$PKGDEST} $pkgname${rst}"
 		fi
 	fi
 }
@@ -2066,6 +2854,9 @@ ${bold}Opções:${reset}
   ${green}new --from-voidlinuxbr ${yellow}<pacote>${reset}  Importar template de pacote da Comunidade VoidLinuxBR (requer revisão manual)
   ${green}new --from-void ${yellow}<pacote>${reset}         Importar template de pacote do Void Linux (requer revisão manual)
   ${green}new --from-venom ${yellow}<pacote>${reset}        Importar template de pacote do Venom Linux (requer revisão manual)
+  ${green}new --from-alpine ${yellow}<pacote>${reset}       Importar APKBUILD do Alpine Linux (requer revisão manual)
+  ${green}new --from-fedora ${yellow}<pacote>${reset}       Importar .spec do Fedora (requer revisão manual)
+  ${green}new --from-debian ${yellow}<pacote>${reset}       Importar pacote fonte do Debian (requer revisão manual)
   ${green}-d${reset}, ${green}--debug${reset}                      Ativa modo debug
   ${green}-h${reset}, ${green}--help${reset}                       Mostrar este ajuda
 

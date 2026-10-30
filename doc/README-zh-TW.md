@@ -149,6 +149,9 @@ Opções:
   new --from-voidlinuxbr <pacote>  Importar template de pacote da Comunidade VoidLinuxBR (requer revisão manual)
   new --from-void <pacote>         Importar template de pacote do Void Linux (requer revisão manual)
   new --from-venom <pacote>        Importar template de pacote do Venom Linux (requer revisão manual)
+  new --from-alpine <pacote>       Importar APKBUILD do Alpine Linux (requer revisão manual)
+  new --from-fedora <pacote>       Importar .spec do Fedora (requer revisão manual)
+  new --from-debian <pacote>       Importar pacote fonte do Debian (requer revisão manual)
   -h, --help                       Mostrar este ajuda
   -d, --debug                      Ativa modo debug
 
