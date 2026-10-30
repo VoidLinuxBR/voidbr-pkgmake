@@ -27,6 +27,7 @@ depends=(
 	docker-buildx
 	jq
 	fakeroot
+	openssh
 	shfmt
 )
 #conf_files=( /etc/pkgmake.conf /etc/vilmar.conf )

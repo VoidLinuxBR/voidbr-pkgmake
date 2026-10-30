@@ -4,7 +4,7 @@
 #
 #  pkgmake — makepkg-like tool for Void XBPS
 #  Created: dom 21 dez 2025 11:47:51 -04
-#  Updated: sex 30 out 2026 01:20:36 -04
+#  Updated: sex 30 out 2026 01:38:56 -04
 #
 #  Copyright (c) 2019-2026, Vilmar Catafesta <vcatafesta@gmail.com>
 #  Assembled By Vilmar Catafesta for the ChiliLinux project.
@@ -190,11 +190,19 @@ pkgmake_new() {
 	[[ -z "$PKGNAME" ]] &&
 		die "nome do pacote não informado"
 
-	validate_pkgname "$PKGNAME" ||
-		die "nome de pacote inválido: '$PKGNAME' (use apenas letras, números, '.', '_' ou '-')"
+	# Venom e Alpine aceitam repositório/pacote (ex.: core/vim, community/figlet)
+	if [[ "$PKGNAME" == */* && ( "$MODE" == venom || "$MODE" == alpine ) ]]; then
+		[[ "$PKGNAME" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] ||
+			die "nome de pacote inválido: '$PKGNAME' (use repositório/pacote, ex.: core/vim)"
+		validate_pkgname "${PKGNAME##*/}" ||
+			die "nome de pacote inválido: '${PKGNAME##*/}'"
+	else
+		validate_pkgname "$PKGNAME" ||
+			die "nome de pacote inválido: '$PKGNAME' (use apenas letras, números, '.', '_' ou '-')"
+	fi
 
 	[[ "$MODE" != "skeleton" ]] && DIRPKGFILE="$MODE"
-	DIRPKGFILE+="-${PKGNAME}"
+	DIRPKGFILE+="-${PKGNAME##*/}"
 	[[ -e "${DIRPKGFILE}" ]] &&
 		die "diretório '$DIRPKGFILE' já existe"
 
@@ -1119,13 +1127,25 @@ from_debian() {
 			echo 'package() { _builddir; python3 -m installer --destdir="$pkgdir" dist/*.whl; }'
 			;;
 		*)
+			# autotools (configure/configure.ac) ou só Makefile
 			echo 'build() {'
 			echo '	_builddir'
-			echo '	[ -x configure ] || autoreconf -fi'
-			echo '	./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var --mandir=/usr/share/man --infodir=/usr/share/info'
-			echo '	make'
+			echo '	if [ -x configure ] || [ -f configure.ac ] || [ -f configure.in ]; then'
+			echo '		[ -x configure ] || autoreconf -fi'
+			echo '		./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var --mandir=/usr/share/man --infodir=/usr/share/info'
+			echo '		make'
+			echo '	else'
+			echo '		make PREFIX=/usr prefix=/usr'
+			echo '	fi'
 			echo '}'
-			echo 'package() { _builddir; make DESTDIR="$pkgdir" install; }'
+			echo 'package() {'
+			echo '	_builddir'
+			echo '	if [ -f config.status ]; then'
+			echo '		make DESTDIR="$pkgdir" install'
+			echo '	else'
+			echo '		make DESTDIR="$pkgdir" PREFIX=/usr prefix=/usr install'
+			echo '	fi'
+			echo '}'
 			;;
 		esac
 		echo
@@ -1264,7 +1284,9 @@ from_void() {
 		echo "# NOTE: Source: https://github.com/void-linux/void-packages"
 		echo "# NOTE: This PKGFILE MUST be reviewed and adjusted before use"
 		echo
-		cat "$TMP/template"
+		# pre_install/post_install do xbps-src rodam no build (antes/depois do do_install);
+		# no pkgmake esses nomes são os scripts de instalação do pacote: renomeia
+		sed -E 's/^(pre|post)_install\(\)/void_\1_install()/' "$TMP/template"
 	} >PKGFILE
 
 	chmod +x PKGFILE
@@ -1437,7 +1459,6 @@ ensure_privkey() {
 
 	if [[ -t 0 && -t 1 ]]; then
 		warn "chave privada não encontrada: $PRIVKEY"
-		warn "uma chave nova gera assinatura nova: as máquinas que já usam o seu repositório vão precisar aceitar a nova chave pública"
 		readconf "Criar a chave '$PRIVKEY' agora?" || die "assinatura cancelada: chave não encontrada: $PRIVKEY"
 		gen_key
 	else
@@ -2550,6 +2571,8 @@ run_all() {
 	# pelas pastas em src/, que só existem depois da extração)
 	extract
 	detect_src
+	void_build_env
+	run_void_hook post_extract
 
 	# -------------------------------------------------
 	# Diretório de trabalho
@@ -2583,6 +2606,8 @@ run_all() {
 	# -------------------------------------------------
 	# Build
 	# -------------------------------------------------
+	run_void_hook pre_configure
+	run_void_hook pre_build
 	if ((HAS_BUILD)); then
 		msg "Build"
 		cd "$srcdir" || die "falha ao entrar em srcdir"
@@ -2593,6 +2618,7 @@ run_all() {
 		msg "Build style"
 		do_build_style
 	fi
+	run_void_hook post_build
 
 	# -------------------------------------------------
 	# DESTDIR (exceto venom)
@@ -2622,6 +2648,7 @@ run_all() {
 	if [[ "${build_style:-}" == "venom" ]]; then
 		msg "Package step skipped (build_style=venom)"
 	elif ((HAS_PACKAGE)); then
+		run_void_hook void_pre_install
 		msg "Package ${pkgname}"
 		cd "$srcdir" || die "falha ao entrar em srcdir"
 		if ! package; then
@@ -2630,10 +2657,21 @@ run_all() {
 	elif ((HAS_BUILD_STYLE)); then
 		msg "Package (fakeroot)"
 		command -v fakeroot >/dev/null 2>&1 || die "fakeroot não encontrado"
-		fakeroot make install DESTDIR="$DESTDIR" docdir=/usr/share/doc
+		run_void_hook void_pre_install
+		cd "$wrksrc" || die "falha ao entrar em wrksrc"
+		if [[ "${build_style:-}" == "gnu-makefile" ]]; then
+			# shellcheck disable=SC2086
+			fakeroot make install DESTDIR="$DESTDIR" PREFIX=/usr prefix=/usr ${make_install_args:-} ||
+				die "Package falhou, abortando empacotamento"
+		else
+			# shellcheck disable=SC2086
+			fakeroot make install DESTDIR="$DESTDIR" docdir=/usr/share/doc ${make_install_args:-} ||
+				die "Package falhou, abortando empacotamento"
+		fi
 	else
 		die "nenhuma etapa de install encontrada"
 	fi
+	run_void_hook void_post_install
 
 	# -------------------------------------------------
 	# Grava arquivos para backup
@@ -2710,6 +2748,11 @@ do_build_style() {
 	case "$build_style" in
 	gnu-configure)
 		do_build_gnu_configure
+		;;
+	gnu-makefile)
+		cd "$wrksrc" || die "não foi possível entrar em wrksrc"
+		# shellcheck disable=SC2086
+		make ${makejobs:-} CC="${CC:-cc}" PREFIX=/usr prefix=/usr ${make_build_args:-}
 		;;
 	venom)
 		do_build_venom
@@ -2984,6 +3027,21 @@ resolve_conffiles() {
 	# xbps-query --property=conf_files pkgmake
 }
 
+# hooks do xbps-src (post_extract, pre_build...) rodam dentro do $wrksrc
+run_void_hook() {
+	pkg_has_fn "$1" || return 0
+	msg "Hook: $1"
+	(cd "$wrksrc" && "$1") || die "$1 falhou"
+}
+
+# template do Void (xbps-src): variáveis que ele espera do ambiente
+void_build_env() {
+	[[ -n "${distfiles:-}" || -n "${short_desc:-}" ]] || return 0
+	: "${CC:=cc}" "${CXX:=c++}" "${CFLAGS:=-O2 -pipe}" "${CXXFLAGS:=$CFLAGS}" "${LDFLAGS:=}"
+	: "${makejobs:=-j$(nproc)}"
+	export CC CXX CFLAGS CXXFLAGS LDFLAGS makejobs
+}
+
 resolve_fns() {
 	# ---- wrappers (somente se o PKGFILE NÃO definiu a função) ----
 
@@ -2999,12 +3057,12 @@ resolve_fns() {
 
 	# build
 	if ! pkg_has_fn build && pkg_has_fn do_build; then
-		build() { do_build "$@"; }
+		build() { cd "$wrksrc" && do_build "$@"; }
 	fi
 
 	# package / install
 	if ! pkg_has_fn package && pkg_has_fn do_install; then
-		package() { do_install "$@"; }
+		package() { cd "$wrksrc" && do_install "$@"; }
 	fi
 
 	# fetch: sempre existe, do_fetch sobrescreve

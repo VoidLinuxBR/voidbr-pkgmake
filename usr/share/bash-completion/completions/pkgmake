@@ -93,6 +93,12 @@ _pkgmake() {
          return 0
       fi
 
+      # --from-alpine ativo → sugerir os repos do Alpine
+      if [[ " ${COMP_WORDS[*]} " =~ [[:space:]]--from-alpine[[:space:]] ]]; then
+         COMPREPLY=( $(compgen -W "main/ community/ testing/" -- "$cur") )
+         return 0
+      fi
+
       # nome de pacote é livre → não sugerir nada
       return 0
    fi
