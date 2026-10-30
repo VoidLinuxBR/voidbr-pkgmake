@@ -6,7 +6,7 @@ DOCDIR   = $(PREFIX)/share/doc/pkgmake
 COMPDIR  = $(PREFIX)/share/bash-completion/completions
 
 # mesmas dependências do pacote voidbr-pkgmake (pkgfile/PKGFILE)
-DEPENDS = base-devel bash curl git xbps xbps-triggers coreutils ncurses ncurses-devel cmake docker docker-buildx jq fakeroot shfmt
+DEPENDS = base-devel bash curl git xbps xbps-triggers coreutils ncurses ncurses-devel cmake docker docker-buildx jq fakeroot openssh shfmt
 
 SHELL := /bin/bash
 .ONESHELL:
