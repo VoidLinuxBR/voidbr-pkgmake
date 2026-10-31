@@ -4,7 +4,7 @@
 #
 #  pkgmake — makepkg-like tool for Void XBPS
 #  Created: dom 21 dez 2025 11:47:51 -04
-#  Updated: sex 30 out 2026 01:38:56 -04
+#  Updated: sáb 31 out 2026 01:03:44 -04
 #
 #  Copyright (c) 2019-2026, Vilmar Catafesta <vcatafesta@gmail.com>
 #  Assembled By Vilmar Catafesta for the ChiliLinux project.
@@ -45,7 +45,7 @@ set -o pipefail
 
 #system
 declare APP="${0##*/}"
-declare _VERSION_="1.10.30-20261030"
+declare _VERSION_="1.10.31-20261031"
 declare APPDESC="$APP - Wraper for xbps-create"
 declare distro="$(uname -n)"
 declare DEPENDENCIES=(tput)
