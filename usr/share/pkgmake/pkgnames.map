@@ -9,6 +9,7 @@
 #   <nome-void>  "-" remove a dependência (não existe/não é usada no Void)
 #   make         ferramenta só de build: no Venom vai para o makedepends
 #   devel=       pacote -devel do Void quando NÃO segue o padrão <nome-void>-devel
+#                devel=- não acrescenta -devel (toolchain/base: glibc, libgcc, bash...)
 #
 # Regras automáticas (não precisam estar aqui):
 #   python-*  -> python3-*   (só Arch)
@@ -19,7 +20,11 @@
 # ou tiverem "devel=".
 
 # --- bibliotecas / runtime --------------------------------------------
-gcc-libs                libgcc
+glibc                   glibc            devel=-
+libgcc                  libgcc           devel=-
+bash                    bash             devel=-
+libstdc++               libstdc++        devel=-
+gcc-libs                libgcc           devel=-
 gtk2                    gtk+
 gtk3                    gtk+3
 glib2                   glib
@@ -186,3 +191,16 @@ xutils-dev              xorg-util-macros make
 libx11-data             -
 py3-gpep517             python3-build    make
 python3-gpep517         python3-build    make
+
+# --- COSMIC (Arch -> Void) ---------------------------------------------
+libseat.so              libseat
+libegl                  libglvnd
+gst-plugins-base-libs   gst-plugins-base1
+gst-plugins-good        gst-plugins-good1
+networkmanager          NetworkManager
+nm-connection-editor    network-manager-applet
+pipewire-pulse          pipewire
+geoclue                 geoclue2
+noto-fonts              noto-fonts-ttf
+vulkan-driver           -
+archlinux-appstream-data -
