@@ -78,23 +78,17 @@ package() {
 	# VoidBR: runit no lugar das units do systemd (sysusers/tmpfiles viram post_install)
 	rm -rf "${pkgdir}"/usr/lib/sysusers.d "${pkgdir}"/usr/lib/tmpfiles.d
 
-	install -dm755 "${pkgdir}"/etc/sv/cosmic-greeter "${pkgdir}"/etc/sv/cosmic-greeter-daemon
+	# o login é feito pelo greetd do Void (/etc/sv/greetd); o /etc/greetd/config.toml
+	# vem do voidbr-cosmic-config. Aqui só o daemon auxiliar do cosmic-greeter.
+	install -dm755 "${pkgdir}"/etc/sv/cosmic-greeter-daemon
 	cat >"${pkgdir}"/etc/sv/cosmic-greeter-daemon/run <<-'EOF'
 		#!/bin/sh
 		exec 2>&1
 		sv check dbus >/dev/null || exit 1
+		install -d -m 0755 -o cosmic-greeter -g cosmic-greeter /run/cosmic-greeter
 		exec /usr/bin/cosmic-greeter-daemon
 	EOF
-	cat >"${pkgdir}"/etc/sv/cosmic-greeter/run <<-'EOF'
-		#!/bin/sh
-		exec 2>&1
-		sv check dbus >/dev/null || exit 1
-		sv check cosmic-greeter-daemon >/dev/null || exit 1
-		install -d -m 0755 -o cosmic-greeter -g cosmic-greeter /run/cosmic-greeter
-		exec greetd --config /etc/greetd/cosmic-greeter.toml
-	EOF
-	chmod 755 "${pkgdir}"/etc/sv/cosmic-greeter{,-daemon}/run
-	ln -s /run/runit/supervise.cosmic-greeter "${pkgdir}"/etc/sv/cosmic-greeter/supervise
+	chmod 755 "${pkgdir}"/etc/sv/cosmic-greeter-daemon/run
 	ln -s /run/runit/supervise.cosmic-greeter-daemon "${pkgdir}"/etc/sv/cosmic-greeter-daemon/supervise
 }
 
@@ -110,7 +104,7 @@ post_install() {
 			-c "Cosmic Greeter Account" cosmic-greeter
 	fi
 	install -d -m 0750 -o cosmic-greeter -g cosmic-greeter /var/lib/cosmic-greeter
-	log "Para ativar: ln -s /etc/sv/cosmic-greeter-daemon /etc/sv/cosmic-greeter /var/service/"
+	log "Para ativar: ln -s /etc/sv/cosmic-greeter-daemon /etc/sv/greetd /var/service/"
 }
 
 pre_upgrade() {

@@ -130,6 +130,7 @@ Uso:
 
 Opções:
   -s, --syncdeps                   Instalar depends e makedepends
+      --checkdeps                  Conferir depends/makedepends nos repositórios e abortar se faltar algum
   -i, --install                    Instalar pacote após o build
   -f, --force                      Forçar reinstalação do pacote
   -q, --quiet                      Silenciar saída dos comandos
