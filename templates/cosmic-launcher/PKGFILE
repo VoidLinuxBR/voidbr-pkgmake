@@ -28,6 +28,7 @@ makedepends=(
 	'wayland-devel'
 	'cargo'
 	'clang'
+	'clang21-devel' # VoidBR: libclang.so (bindgen/clang-sys); no Arch vem no clang
 	'git'
 	'intltool'
 	'just'

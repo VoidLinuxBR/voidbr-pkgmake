@@ -40,6 +40,7 @@ makedepends=(
 	'playerctl-devel'
 	'wireplumber-devel'
 	'clang'
+	'clang21-devel' # VoidBR: libclang.so (bindgen/clang-sys); no Arch vem no clang
 	'cargo'
 	'git'
 	'just'
