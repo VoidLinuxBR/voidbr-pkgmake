@@ -1681,6 +1681,21 @@ load_pkgmap() {
 	PKGMAP_LOADED=1
 }
 
+declare -gA REPO_NAMES=()
+REPO_NAMES_LOADED=0
+
+# carrega de uma vez os nomes de todos os pacotes dos repositórios
+# (cada xbps-query -R relê o índice inteiro: ~0,3s por chamada)
+load_repo_names() {
+	((REPO_NAMES_LOADED)) && return 0
+	REPO_NAMES_LOADED=1
+	local opts=(-R) pv
+	[[ -n "${PKGDEST:-}" && -d "$PKGDEST" ]] && opts+=(--repository="$PKGDEST")
+	while read -r _ pv _; do
+		[[ -n "$pv" ]] && REPO_NAMES["${pv%-*}"]=1
+	done < <(xbps-query "${opts[@]}" -s '' 2>/dev/null)
+}
+
 # pacote existe nos repositórios do Void (configurados + PKGDEST local)?
 repo_has() {
 	local n="$1" r=1
@@ -1688,6 +1703,12 @@ repo_has() {
 	if [[ -n "${REPO_HAS_CACHE[$n]+x}" ]]; then
 		return "${REPO_HAS_CACHE[$n]}"
 	fi
+	load_repo_names
+	if [[ -n "${REPO_NAMES[$n]+x}" ]]; then
+		REPO_HAS_CACHE["$n"]=0
+		return 0
+	fi
+	# fora da lista (virtual/provides etc.): consulta individual
 	[[ -n "${PKGDEST:-}" && -d "$PKGDEST" ]] && opts+=(--repository="$PKGDEST")
 	xbps-query "${opts[@]}" "$n" >/dev/null 2>&1 && r=0
 	REPO_HAS_CACHE["$n"]=$r
