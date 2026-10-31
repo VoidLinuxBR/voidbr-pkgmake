@@ -24,6 +24,7 @@ depends=(
 # NOTE: makedepends original (arch): cargo clang cmake git just lld
 makedepends=(
 	'libde265-devel'
+	'libaom-tools' # VoidBR: o AOMTargets.cmake do libaom-devel referencia /usr/bin/aomdec (libheif embutido)
 	'libjpeg-turbo-devel'
 	'libxkbcommon-devel'
 	'cargo'
