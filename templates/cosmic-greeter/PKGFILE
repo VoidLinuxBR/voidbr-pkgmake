@@ -33,6 +33,7 @@ makedepends=(
 	'wayland-devel'
 	'cargo'
 	'clang'
+	'clang21-devel' # VoidBR: libclang.so (bindgen/clang-sys); no Arch vem no clang
 	'git'
 	'git-lfs'
 	'just'
@@ -55,6 +56,8 @@ prepare() {
 	git lfs fetch network-origin
 	git lfs checkout
 	# revert pam config for now
+	# VoidBR: clone raso (--depth=1) não tem o commit; busca ele e o pai antes do revert
+	git fetch --depth=2 origin ef1253aa2393666bb2a0b0132b722f51ec7ebbf3
 	git revert -n ef1253aa2393666bb2a0b0132b722f51ec7ebbf3
 	cargo fetch --locked
 	patch -Np1 -i ../cosmic-greeter-display-manager.patch

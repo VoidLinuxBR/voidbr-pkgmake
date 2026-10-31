@@ -33,6 +33,7 @@ makedepends=(
 	'libzstd-devel'
 	'cargo'
 	'clang'
+	'clang21-devel' # VoidBR: libclang.so (bindgen/clang-sys); no Arch vem no clang
 	'git'
 	'just'
 	'lld'
