@@ -1422,7 +1422,7 @@ die() {
 }
 
 msg() { echo -e "${cyan}==> $*${reset}"; }
-warn() { echo -e "${yellow}==> aviso: $*${reset}" >&2; }
+warn() { echo -e "${yellow}==> AVISO: $*${reset}" >&2; }
 msg_error() {
 	printf "${red}ERROR: %s${reset}\n" "$*" >&2
 	exit 1
@@ -2103,7 +2103,7 @@ check_deps_repo() {
 			elif [[ "${PKGMAP[$n]:-}" == "-" ]]; then
 				warn "$v: '$n' não é usado no Void; remova do PKGFILE"
 			else
-				warn "$v: '$n' não encontrado nos repositórios do Void"
+				warn "$v: '$n' não encontrado nos repositórios configurados"
 			fi
 		done
 		unset -n _deps
