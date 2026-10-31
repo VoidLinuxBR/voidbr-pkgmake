@@ -65,6 +65,7 @@ export CARCH="${CARCH:-$ARCH}"
 
 SYNCDEPS=0
 CLI_SYNCDEPS=""
+CHECKDEPS=0
 
 INSTALLPKG=0
 FORCEPKG=0
@@ -2086,10 +2087,13 @@ write_translated_deps() {
 	report_missing_deps
 }
 
-# conferência no build: só avisa, não altera nada
+# conferência no build (só com --checkdeps): confere TODAS as dependências
+# nos repositórios configurados, avisa cada uma e aborta antes do Lint
 check_deps_repo() {
-	local v d n
-	command -v xbps-query >/dev/null 2>&1 || return 0
+	local v d n missing=()
+	((CHECKDEPS)) || return 0
+	command -v xbps-query >/dev/null 2>&1 || die "--checkdeps: xbps-query não encontrado"
+	msg "Conferindo depends/makedepends nos repositórios configurados"
 	load_pkgmap || true
 	for v in depends makedepends; do
 		local -n _deps="$v"
@@ -2105,9 +2109,13 @@ check_deps_repo() {
 			else
 				warn "$v: '$n' não encontrado nos repositórios configurados"
 			fi
+			missing+=("$n")
 		done
 		unset -n _deps
 	done
+
+	((${#missing[@]})) && die "dependências não encontradas (${#missing[@]}): ${missing[*]}"
+	msg "Todas as dependências encontradas"
 }
 
 sync_deps() {
@@ -2934,6 +2942,7 @@ ${bold}Uso:${reset}
 
 ${bold}Opções:${reset}
   ${green}-s${reset}, ${green}--syncdeps${reset}                   Instalar depends e makedepends
+      ${green}--checkdeps${reset}                  Conferir depends/makedepends nos repositórios e abortar se faltar algum
   ${green}-i${reset}, ${green}--install${reset}                    Instalar pacote após o build
   ${green}-f${reset}, ${green}--force${reset}                      Forçar reinstalação do pacote
   ${green}-q${reset}, ${green}--quiet${reset}                      Silenciar saída dos comandos
@@ -3341,6 +3350,10 @@ while [[ $# -gt 0 ]]; do
 	case "$1" in
 	-s | --syncdeps)
 		CLI_SYNCDEPS=1
+		shift
+		;;
+	--checkdeps)
+		CHECKDEPS=1
 		shift
 		;;
 	-i | --install)

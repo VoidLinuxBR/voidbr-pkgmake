@@ -20,6 +20,7 @@ _pkgmake() {
       -i --install
       -f --force
       -s --syncdeps
+      --checkdeps
       -q --quiet
       -v --verbose
       -c --clean
