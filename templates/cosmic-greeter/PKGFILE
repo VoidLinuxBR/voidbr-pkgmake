@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+# NOTE: Imported from Arch Linux/AUR
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+# Maintainer: Maxime Gauduin <alucryd@archlinux.org>
+# Maintainer: Peter Jung <ptr1337@archlinux.org>
+# Contributor: Mark Wagie <mark.wagie@proton.me>
+
+pkgname=cosmic-greeter
+pkgver=1.10.0
+pkgrel=1
+epoch=1
+pkgdesc='COSMIC greeter for greetd'
+arch=(x86_64)
+url=https://github.com/pop-os/cosmic-greeter
+license=(GPL-3.0-only)
+groups=(cosmic)
+depends=(
+	cosmic-comp
+	cosmic-icon-theme
+	dbus
+	dav1d
+	libgcc
+	glibc
+	greetd
+	libxkbcommon
+	pam
+	wayland
+)
+# NOTE: makedepends original (arch): cargo clang git git-lfs just lld
+makedepends=(
+	'libxkbcommon-devel'
+	'pam-devel'
+	'wayland-devel'
+	'cargo'
+	'clang'
+	'git'
+	'git-lfs'
+	'just'
+	'lld'
+)
+backup=(etc/greetd/cosmic-greeter.toml)
+source=(
+	git+https://github.com/pop-os/cosmic-greeter.git#tag=epoch-${pkgver}
+	cosmic-greeter-display-manager.patch
+	cosmic-greeter-lto.patch
+)
+b2sums=('c5376460c27138f486e46a38b27ce9f42b48957fa6c14f06a5d46d0c20acc87c1a8232f55d9095a501b2a000e20f59b45982790e199168c642f3dec21e6bb38c'
+	'8b5c32a991e31cf102b1b07e06d37e979f19106b82e8cab7dc8df81789ab6b24587605aa3387254057732a268368c4074f92461f6f5125bc1cba4e62e18cef27'
+	'89ca262c95713e773662fb81e379bc2b63d2c93072b909f8f1eaaafee5289359fd729a476eb66568f893986a53e9c689dccfc4aeeeef62cb736cff466c463f7d')
+
+prepare() {
+	cd cosmic-greeter
+	git lfs install --local
+	git remote add network-origin ${url}
+	git lfs fetch network-origin
+	git lfs checkout
+	# revert pam config for now
+	git revert -n ef1253aa2393666bb2a0b0132b722f51ec7ebbf3
+	cargo fetch --locked
+	patch -Np1 -i ../cosmic-greeter-display-manager.patch
+	patch -Np1 -i ../cosmic-greeter-lto.patch
+}
+
+build() {
+	cd cosmic-greeter
+	RUSTFLAGS+=" -C link-arg=-fuse-ld=lld"
+	just build-release --frozen
+}
+
+package() {
+	cd cosmic-greeter
+	just rootdir="${pkgdir}" install
+	install -Dm 644 cosmic-greeter.toml -t "${pkgdir}"/etc/greetd/
+
+	# VoidBR: runit no lugar das units do systemd (sysusers/tmpfiles viram post_install)
+	rm -rf "${pkgdir}"/usr/lib/sysusers.d "${pkgdir}"/usr/lib/tmpfiles.d
+
+	install -dm755 "${pkgdir}"/etc/sv/cosmic-greeter "${pkgdir}"/etc/sv/cosmic-greeter-daemon
+	cat >"${pkgdir}"/etc/sv/cosmic-greeter-daemon/run <<-'EOF'
+		#!/bin/sh
+		exec 2>&1
+		sv check dbus >/dev/null || exit 1
+		exec /usr/bin/cosmic-greeter-daemon
+	EOF
+	cat >"${pkgdir}"/etc/sv/cosmic-greeter/run <<-'EOF'
+		#!/bin/sh
+		exec 2>&1
+		sv check dbus >/dev/null || exit 1
+		sv check cosmic-greeter-daemon >/dev/null || exit 1
+		install -d -m 0755 -o cosmic-greeter -g cosmic-greeter /run/cosmic-greeter
+		exec greetd --config /etc/greetd/cosmic-greeter.toml
+	EOF
+	chmod 755 "${pkgdir}"/etc/sv/cosmic-greeter{,-daemon}/run
+	ln -s /run/runit/supervise.cosmic-greeter "${pkgdir}"/etc/sv/cosmic-greeter/supervise
+	ln -s /run/runit/supervise.cosmic-greeter-daemon "${pkgdir}"/etc/sv/cosmic-greeter-daemon/supervise
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+	# VoidBR: equivalente ao debian/cosmic-greeter.sysusers e .tmpfiles
+	if ! getent passwd cosmic-greeter >/dev/null; then
+		useradd -r -U -G video -d /var/lib/cosmic-greeter -s /usr/bin/nologin \
+			-c "Cosmic Greeter Account" cosmic-greeter
+	fi
+	install -d -m 0750 -o cosmic-greeter -g cosmic-greeter /var/lib/cosmic-greeter
+	log "Para ativar: ln -s /etc/sv/cosmic-greeter-daemon /etc/sv/cosmic-greeter /var/service/"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+}

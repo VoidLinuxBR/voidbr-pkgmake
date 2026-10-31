@@ -1816,7 +1816,8 @@ map_dep() {
 devel_of() {
 	local n="$1"
 	if [[ -n "${PKGMAP_DEVEL[$n]+x}" ]]; then
-		echo "${PKGMAP_DEVEL[$n]}"
+		# devel=- : pacote sem -devel útil para o build (toolchain/base)
+		[[ "${PKGMAP_DEVEL[$n]}" == "-" ]] || echo "${PKGMAP_DEVEL[$n]}"
 	elif [[ "$n" == *-devel ]]; then
 		echo "$n"
 	elif repo_has "$n-devel"; then
