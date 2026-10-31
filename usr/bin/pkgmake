@@ -1375,6 +1375,23 @@ validate_packager_sanity() {
 	fi
 }
 
+# arch-meson: wrapper do Arch usado em PKGBUILDs importados (--from-arch)
+# equivalente com os caminhos do Void (build-style meson do xbps-src)
+if ! command -v arch-meson >/dev/null 2>&1; then
+	arch-meson() {
+		meson setup \
+			--prefix=/usr \
+			--libexecdir=/usr/libexec \
+			--sbindir=/usr/bin \
+			--buildtype=plain \
+			--auto-features=auto \
+			--wrap-mode=nodownload \
+			-D b_pie=true \
+			-D python.bytecompile=1 \
+			"$@"
+	}
+fi
+
 cmd_run() {
 	if [[ "$VERBOSE" -eq 0 ]]; then
 		"$@" >/dev/null
@@ -2151,6 +2168,11 @@ fetch() {
 			repo="${repo%%\?*}"
 
 			[[ -z "$cname" ]] && cname="$(basename "$repo" .git)"
+
+			# PKGBUILD do Arch costuma usar #tag=<hash do commit>: trata como commit
+			if [[ "$ref_type" == tag || "$ref_type" == branch ]] && [[ "$ref" =~ ^[0-9a-f]{7,40}$ ]]; then
+				ref_type=commit
+			fi
 
 			if [[ -d "$cname/.git" ]]; then
 				msg "Usando repositório git existente: $cname"
