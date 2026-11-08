@@ -2739,6 +2739,17 @@ run_all() {
 	INSTALL_OPTS=()
 	[[ -f "$WORKDIR/INSTALL" ]] && INSTALL_OPTS+=(-S "$WORKDIR/INSTALL")
 
+	# shlib-provides: SONAMEs das bibliotecas do pacote (como o xbps-src faz).
+	# Sem isso, pacotes do Void que dependem dessas bibliotecas (ex.: terminology
+	# pedindo libecore.so.1) ficam "broken, unresolvable shlib" ao trocar a lib
+	# do Void por esta. O PKGFILE pode definir shlib_provides=() manualmente.
+	if declare -p shlib_provides &>/dev/null; then
+		shlib_provides_list="${shlib_provides[*]}"
+	else
+		shlib_provides_list="$(gen_shlib_provides "$pkgdir")"
+	fi
+	[[ -n "$shlib_provides_list" ]] && msg "shlib-provides: ${shlib_provides_list}"
+
 	msg "Create XBPS $PKGOUT"
 	cmd_run xbps-create \
 		--architecture "$ARCH" \
@@ -2750,6 +2761,7 @@ run_all() {
 		--provides "$provides_list" \
 		--replaces "$replaces_list" \
 		--conflicts "$conflicts_list" \
+		--shlib-provides "$shlib_provides_list" \
 		--config-files "$conf_files_arg" \
 		"$pkgdir"
 
@@ -2793,6 +2805,29 @@ run_all() {
 			msg "Install with #2: ${yellow}vinstall -R ${PKGMAKE_HOST_PKGDEST:-$PKGDEST} $pkgname${rst}"
 		fi
 	fi
+}
+
+################################################################################################################
+# gen_shlib_provides <pkgdir>
+#   imprime os SONAMEs das bibliotecas compartilhadas em lib/, usr/lib/ e usr/lib64/
+#   (só o primeiro nível: módulos/plugins em subpastas não entram, como no xbps-src)
+################################################################################################################
+gen_shlib_provides() {
+	local dir="$1" f soname
+	local -a sonames=()
+
+	if ! command -v readelf >/dev/null 2>&1; then
+		msg "readelf não encontrado (binutils): shlib-provides não gerado" >&2
+		return 0
+	fi
+
+	while IFS= read -r -d '' f; do
+		soname="$(readelf -d "$f" 2>/dev/null | sed -n 's/.*(SONAME).*\[\(.*\)\].*/\1/p')"
+		[[ -n "$soname" ]] && sonames+=("$soname")
+	done < <(find "$dir/lib" "$dir/usr/lib" "$dir/usr/lib64" -maxdepth 1 -type f -name '*.so*' -print0 2>/dev/null)
+
+	((${#sonames[@]})) || return 0
+	printf '%s\n' "${sonames[@]}" | sort -u | paste -sd' '
 }
 
 # dispatcher mínimo para build_style

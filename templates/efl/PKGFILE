@@ -9,7 +9,7 @@
 
 pkgname=efl
 pkgver=1.29.0
-pkgrel=1
+pkgrel=2
 pkgdesc='Enlightenment Foundation Libraries'
 arch=(x86_64 aarch64)
 url=https://www.enlightenment.org
