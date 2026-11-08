@@ -1,0 +1,23 @@
+Void/VoidBR (runit): suspender e hibernar com zzz/ZZZ quando não há systemctl.
+Sem isso o E 0.28 procura sleep.sh/pm-suspend, que não existem no Void.
+
+--- a/src/bin/system/e_system_power.c	2026-11-08 14:13:53.136054061 -0400
++++ b/src/bin/system/e_system_power.c	2026-11-08 14:13:53.185933562 -0400
+@@ -85,6 +85,8 @@
+ #else
+    if (ecore_file_app_installed("systemctl"))
+      _cmd_suspend = strdup("systemctl suspend");
++   else if (ecore_file_app_installed("zzz"))
++     _cmd_suspend = strdup("zzz");
+    else if (ecore_file_app_installed("sleep.sh"))
+      _cmd_suspend = strdup("sleep.sh");
+    else if (ecore_file_can_exec("/etc/acpi/sleep.sh"))
+@@ -118,6 +120,8 @@
+ #else
+    if (ecore_file_app_installed("systemctl"))
+      _cmd_hibernate = strdup("systemctl hibernate");
++   else if (ecore_file_app_installed("ZZZ"))
++     _cmd_hibernate = strdup("ZZZ");
+    else if (ecore_file_app_installed("hibernate.sh"))
+      _cmd_hibernate = strdup("hibernate.sh");
+    else if (ecore_file_can_exec("/etc/acpi/hibernate.sh"))
