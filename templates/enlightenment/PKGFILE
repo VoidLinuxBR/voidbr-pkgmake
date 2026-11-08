@@ -30,8 +30,7 @@ makedepends=(
 	meson
 	pkgconf
 	gettext
-	gettext-devel
-	'efl>=1.29.0' # traz também os headers e .pc (efl-devel)
+	'efl>=1.29.0' # headers e .pc do efl (o efl do VoidBR já inclui o efl-devel)
 	pam-devel
 	xkeyboard-config
 	libexif-devel
@@ -40,6 +39,60 @@ makedepends=(
 	wayland-devel
 	wayland-protocols
 	xorg-server-xwayland
+	# Os .pc do efl citam as bibliotecas usadas no build do efl (Requires.private),
+	# e o pkg-config precisa delas para compilar contra o efl: no Void isso vem como
+	# dependência do efl-devel; aqui vai a mesma lista do makedepends do efl.
+	gettext-devel
+	openssl-devel
+	liblz4-devel
+	glib-devel
+	ibus-devel
+	fontconfig-devel
+	fribidi-devel
+	harfbuzz-devel
+	libjpeg-turbo-devel
+	libpng-devel
+	giflib-devel
+	tiff-devel
+	libwebp-devel
+	avahi-libs-devel
+	eudev-libudev-devel
+	libgomp-devel
+	libsndfile-devel
+	libmount-devel
+	LuaJIT-devel
+	lua52-devel
+	poppler-cpp-devel
+	librsvg-devel
+	libspectre-devel
+	libraw-devel
+	libopenjpeg2-devel
+	libheif-devel
+	libavif-devel
+	libjxl-devel
+	openh264-devel
+	libdrm-devel
+	libinput-devel
+	elogind-devel
+	gst-plugins-base1-devel
+	libXcomposite-devel
+	libXcursor-devel
+	libXp-devel
+	libXrandr-devel
+	libXScrnSaver-devel
+	libXdamage-devel
+	libXrender-devel
+	libXi-devel
+	libXinerama-devel
+	libXpresent-devel
+	xcb-util-devel
+	xcb-util-keysyms-devel
+	xcb-util-image-devel
+	xcb-util-renderutil-devel
+	xcb-util-wm-devel
+	xorgproto
+	pulseaudio-devel
+	pipewire-devel
 )
 backup=(etc/enlightenment/sysactions.conf)
 source=("https://download.enlightenment.org/rel/apps/${pkgname}/${pkgname}-${pkgver}.tar.xz")
