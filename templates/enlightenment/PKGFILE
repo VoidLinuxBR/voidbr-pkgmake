@@ -7,11 +7,14 @@
 # histórico da área de transferência, e os eventos de ACPI (tampa, botões)
 # lidos direto do /dev/input, sem acpid.
 #
+# Patches do VoidBR: 01 suspende com zzz/ZZZ; 02 adiciona o módulo "voidbr"
+# (central de controle) e o nome/botões de energia na tela de bloqueio.
+#
 # Como no efl, os headers/.pc (enlightenment-devel no Void) vão neste pacote.
 
 pkgname=enlightenment
 pkgver=0.28.0
-pkgrel=1
+pkgrel=2
 pkgdesc='Enlightenment desktop shell'
 arch=(x86_64 aarch64)
 url=https://www.enlightenment.org
@@ -103,6 +106,11 @@ prepare() {
 
 	# suspender/hibernar com zzz/ZZZ (o E 0.28 só conhece systemctl, sleep.sh e pm-suspend)
 	patch -Np1 -i ../../patches/01-void-zzz.patch
+
+	# módulo voidbr (pílula de status, central de controle, título da janela) e
+	# tela de bloqueio com nome do usuário e botões de energia; o visual vem do
+	# tema do voidbr-enlightenment-config
+	patch -Np1 -i ../../patches/02-voidbr.patch
 }
 
 build() {
