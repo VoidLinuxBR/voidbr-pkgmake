@@ -1,0 +1,1059 @@
+diff -ruN a/meson_options.txt b/meson_options.txt
+--- a/meson_options.txt	2026-10-31 07:27:41.000000000 -0400
++++ b/meson_options.txt	2026-11-08 23:02:25.084581436 -0400
+@@ -318,6 +318,10 @@
+ 	type: 'boolean',
+ 	value: true,
+ 	description: 'Enable gesture recognition using libinput, needed to get swipe bindings beeing detected.')
++option('voidbr',
++	type: 'boolean',
++	value: true,
++	description: 'enable voidbr module (status, control center, window title): (default=true)')
+ option('procstats',
+ 	type: 'boolean',
+ 	value: true,
+diff -ruN a/src/bin/e_module.c b/src/bin/e_module.c
+--- a/src/bin/e_module.c	2026-10-31 07:27:41.000000000 -0400
++++ b/src/bin/e_module.c	2026-11-08 23:02:25.087589382 -0400
+@@ -789,6 +789,7 @@
+          "procstats",
+          "pants",
+          "clipboard",
++         "voidbr",
+       NULL   // end marker
+    };
+ 
+diff -ruN a/src/modules/lokker/lokker.c b/src/modules/lokker/lokker.c
+--- a/src/modules/lokker/lokker.c	2026-10-31 07:27:41.000000000 -0400
++++ b/src/modules/lokker/lokker.c	2026-11-08 23:02:25.088903904 -0400
+@@ -1,5 +1,7 @@
+ #include "e_mod_main.h"
+ #include <sys/mman.h>
++#include <pwd.h>
++#include <ctype.h>
+ 
+ #define PASSWD_LEN                256
+ 
+@@ -289,6 +291,40 @@
+    edje_object_part_swallow(lp->login_box, "e.swallow.buttons", table);
+ }
+ 
++/* VoidBR: nome e iniciais do usuário no tema, e botões de energia */
++static void
++_lokker_voidbr_user_set(Evas_Object *o)
++{
++   const struct passwd *pw = getpwuid(getuid());
++   char name[256] = "", ini[8] = "";
++   char *last;
++
++   if (!pw) return;
++   if (pw->pw_gecos && pw->pw_gecos[0])
++     {
++        eina_strlcpy(name, pw->pw_gecos, sizeof(name));
++        if (strchr(name, ',')) *strchr(name, ',') = 0;
++     }
++   if (!name[0]) eina_strlcpy(name, pw->pw_name, sizeof(name));
++   last = strrchr(name, ' ');
++   snprintf(ini, sizeof(ini), "%c%c", toupper((unsigned char)name[0]),
++            (last && last[1]) ? toupper((unsigned char)last[1]) : 0);
++   edje_object_part_text_set(o, "e.text.user", name);
++   edje_object_part_text_set(o, "e.text.initials", ini);
++}
++
++static void
++_lokker_voidbr_power_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
++                        const char *emission, const char *source EINA_UNUSED)
++{
++   if (!strcmp(emission, "e,action,voidbr,suspend"))
++     e_sys_action_do(E_SYS_SUSPEND, NULL);
++   else if (!strcmp(emission, "e,action,voidbr,reboot"))
++     e_sys_action_do(E_SYS_REBOOT, NULL);
++   else if (!strcmp(emission, "e,action,voidbr,halt"))
++     e_sys_action_do(E_SYS_HALT, NULL);
++}
++
+ static void
+ _text_login_box_add(Lokker_Popup *lp)
+ {
+@@ -316,6 +352,9 @@
+                            "e/desklock/login_box");
+    edje_object_part_text_set(lp->login_box, "e.text.title",
+                              _("Please enter your unlock password"));
++   _lokker_voidbr_user_set(lp->login_box);
++   edje_object_signal_callback_add(lp->login_box, "e,action,voidbr,*", "e",
++                                   _lokker_voidbr_power_cb, NULL);
+    if (evas_key_lock_is_set(evas_key_lock_get(evas), "Caps_Lock"))
+         edje_object_part_text_set(lp->login_box, "e.text.hint",
+                              _("Caps Lock is On"));
+diff -ruN a/src/modules/meson.build b/src/modules/meson.build
+--- a/src/modules/meson.build	2026-10-31 07:27:41.000000000 -0400
++++ b/src/modules/meson.build	2026-11-08 23:02:25.087334806 -0400
+@@ -48,6 +48,7 @@
+   'packagekit',
+   'vkbd',
+   'procstats',
++  'voidbr',
+ # modules have a custom binary as well
+   'battery',
+   'cpufreq',
+diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
+--- a/src/modules/voidbr/e_mod_main.c	1969-12-31 20:00:00.000000000 -0400
++++ b/src/modules/voidbr/e_mod_main.c	2026-11-08 23:02:25.060991861 -0400
+@@ -0,0 +1,936 @@
++/*
++ * Módulo "voidbr" do Enlightenment (VoidBR Linux)
++ *
++ * Dois gadgets para a barra:
++ *
++ *   voidbr-status  pílula com Wi-Fi, volume e bateria. Um clique abre a
++ *                  central de controle: cartões de Wi-Fi, Bluetooth, Mosaico,
++ *                  Não perturbe, Captura e Ajustes; volume e brilho; bloquear
++ *                  e desligar.
++ *   voidbr-title   título da janela ativa.
++ *
++ * O visual vem dos grupos e/modules/voidbr/... do tema VoidBR
++ * (voidbr-enlightenment-config, src/theme/central.edc).
++ *
++ * Wi-Fi e Bluetooth usam nmcli e bluetoothctl; o volume usa wpctl
++ * (PipeWire). Se um deles não existir, o item correspondente some ou
++ * fica sem efeito. O brilho usa o backlight do próprio E.
++ */
++#include "e.h"
++#include <pwd.h>
++#include <dirent.h>
++
++#define THEME_GROUP(_g) "e/modules/voidbr/" _g
++
++/* -------------------------------------------------------------- estado */
++
++typedef enum
++{
++   CARD_WIFI,
++   CARD_BT,
++   CARD_TILING,
++   CARD_DND,
++   CARD_SHOT,
++   CARD_TWEAKS,
++   CARD_LAST
++} Card_Id;
++
++typedef struct
++{
++   E_Gadcon_Client *gcc;
++   Evas_Object     *o;
++   E_Gadcon_Popup  *popup;
++   Evas_Object     *o_header, *o_sliders, *o_footer;
++   Evas_Object     *o_card[CARD_LAST];
++   Evas_Object     *o_vol, *o_bri;
++} Status;
++
++typedef struct
++{
++   E_Gadcon_Client *gcc;
++   Evas_Object     *o;
++} Title;
++
++static struct
++{
++   E_Module    *module;
++   Eina_List   *status, *titles, *handlers;
++   Ecore_Timer *poll, *refresh;
++   int          poll_count;
++   int          wifi;       /* -1 sem placa, 0 desconectado, 1 conectado */
++   int          wifi_radio; /* -1 sem nmcli, 0 desligado, 1 ligado */
++   char         ssid[128];
++   int          bt;         /* -1 sem controlador, 0 desligado, 1 ligado */
++   int          vol;        /* -1 sem wpctl, 0..150 */
++   Eina_Bool    mute;
++   int          bat;        /* -1 sem bateria, 0..100 */
++   Eina_Bool    charging;
++   Eina_Bool    vol_busy;   /* usuário mexendo no slider */
++} st;
++
++static const char *EXE_TAG = "voidbr-mod";
++
++static void _status_update(Status *s);
++static void _popup_update(Status *s);
++static void _popup_del(Status *s);
++
++/* ----------------------------------------------------------- utilidades */
++
++static Evas_Object *
++_edje(Evas *evas, const char *group)
++{
++   Evas_Object *o = edje_object_add(evas);
++   if (!e_theme_edje_object_set(o, "base/theme/modules/voidbr", group))
++     {
++        evas_object_del(o);
++        return NULL;
++     }
++   return o;
++}
++
++static void
++_min_hint(Evas_Object *o)
++{
++   Evas_Coord mw = 0, mh = 0, w = 0, h = 0;
++   edje_object_size_min_get(o, &mw, &mh);
++   edje_object_size_min_restricted_calc(o, &w, &h, mw, mh);
++   evas_object_size_hint_min_set(o, MAX(w, mw), MAX(h, mh));
++}
++
++static Eina_Bool
++_file_read(const char *path, char *buf, size_t len)
++{
++   FILE *f = fopen(path, "r");
++   size_t n;
++
++   if (!f) return EINA_FALSE;
++   n = fread(buf, 1, len - 1, f);
++   fclose(f);
++   buf[n] = 0;
++   while (n && ((buf[n - 1] == '\n') || (buf[n - 1] == ' '))) buf[--n] = 0;
++   return EINA_TRUE;
++}
++
++static void
++_run(const char *cmd)
++{
++   ecore_exe_run(cmd, NULL);
++}
++
++/* comandos cuja saída interessa: a tag diz como ler */
++static void
++_query(const char *tag, const char *cmd)
++{
++   Ecore_Exe *exe;
++
++   exe = ecore_exe_pipe_run(cmd, ECORE_EXE_PIPE_READ | ECORE_EXE_PIPE_READ_LINE_BUFFERED |
++                            ECORE_EXE_NOT_LEADER | ECORE_EXE_TERM_WITH_PARENT, (void *)EXE_TAG);
++   if (exe) ecore_exe_tag_set(exe, tag);
++}
++
++/* ----------------------------------------------------------- leituras */
++
++static void
++_read_sys(void)
++{
++   DIR *d;
++   struct dirent *de;
++   char path[PATH_MAX], buf[64];
++
++   /* Wi-Fi: alguma interface sem fio? está "up"? */
++   st.wifi = -1;
++   if ((d = opendir("/sys/class/net")))
++     {
++        while ((de = readdir(d)))
++          {
++             if (de->d_name[0] == '.') continue;
++             snprintf(path, sizeof(path), "/sys/class/net/%s/wireless", de->d_name);
++             if (!ecore_file_is_dir(path)) continue;
++             if (st.wifi < 0) st.wifi = 0;
++             snprintf(path, sizeof(path), "/sys/class/net/%s/operstate", de->d_name);
++             if (_file_read(path, buf, sizeof(buf)) && !strcmp(buf, "up")) st.wifi = 1;
++          }
++        closedir(d);
++     }
++
++   /* bateria */
++   st.bat = -1;
++   st.charging = EINA_FALSE;
++   if ((d = opendir("/sys/class/power_supply")))
++     {
++        while ((de = readdir(d)))
++          {
++             if (de->d_name[0] == '.') continue;
++             snprintf(path, sizeof(path), "/sys/class/power_supply/%s/type", de->d_name);
++             if (!_file_read(path, buf, sizeof(buf)) || strcmp(buf, "Battery")) continue;
++             snprintf(path, sizeof(path), "/sys/class/power_supply/%s/capacity", de->d_name);
++             if (!_file_read(path, buf, sizeof(buf))) continue;
++             st.bat = atoi(buf);
++             snprintf(path, sizeof(path), "/sys/class/power_supply/%s/status", de->d_name);
++             if (_file_read(path, buf, sizeof(buf)))
++               st.charging = (!strcmp(buf, "Charging") || !strcmp(buf, "Full"));
++             break;
++          }
++        closedir(d);
++     }
++}
++
++static void
++_query_all(Eina_Bool slow)
++{
++   if (!st.vol_busy)
++     _query("vol", "wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null");
++   if (slow)
++     {
++        _query("radio", "nmcli radio wifi 2>/dev/null");
++        _query("ssid", "nmcli -t -f active,ssid dev wifi 2>/dev/null");
++        _query("bt", "bluetoothctl show 2>/dev/null");
++     }
++}
++
++static void
++_update_all(void)
++{
++   Eina_List *l;
++   Status *s;
++
++   EINA_LIST_FOREACH(st.status, l, s)
++     {
++        _status_update(s);
++        if (s->popup) _popup_update(s);
++     }
++}
++
++static Eina_Bool
++_cb_exe_data(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
++{
++   Ecore_Exe_Event_Data *ev = event;
++   const char *tag;
++   int i;
++
++   if (ecore_exe_data_get(ev->exe) != EXE_TAG) return ECORE_CALLBACK_PASS_ON;
++   tag = ecore_exe_tag_get(ev->exe);
++   if (!tag || !ev->lines) return ECORE_CALLBACK_DONE;
++
++   if (!strcmp(tag, "vol"))
++     {
++        /* "Volume: 0.70 [MUTED]" */
++        for (i = 0; ev->lines[i].line; i++)
++          {
++             const char *p = strstr(ev->lines[i].line, "Volume:");
++             if (!p) continue;
++             st.vol = (int)(atof(p + 7) * 100.0 + 0.5);
++             st.mute = !!strstr(p, "MUTED");
++          }
++     }
++   else if (!strcmp(tag, "radio"))
++     {
++        if (ev->lines[0].line)
++          st.wifi_radio = !strncmp(ev->lines[0].line, "enabled", 7);
++     }
++   else if (!strcmp(tag, "ssid"))
++     {
++        st.ssid[0] = 0;
++        for (i = 0; ev->lines[i].line; i++)
++          {
++             if (!strncmp(ev->lines[i].line, "yes:", 4))
++               {
++                  eina_strlcpy(st.ssid, ev->lines[i].line + 4, sizeof(st.ssid));
++                  break;
++               }
++          }
++     }
++   else if (!strcmp(tag, "bt"))
++     {
++        for (i = 0; ev->lines[i].line; i++)
++          {
++             const char *p = strstr(ev->lines[i].line, "Powered:");
++             if (p) st.bt = !!strstr(p, "yes");
++          }
++     }
++   _update_all();
++   return ECORE_CALLBACK_DONE;
++}
++
++static Eina_Bool
++_cb_poll(void *data EINA_UNUSED)
++{
++   _read_sys();
++   _query_all((st.poll_count++ % 4) == 0); /* nmcli e bluetoothctl a cada 12 s */
++   _update_all();
++   return ECORE_CALLBACK_RENEW;
++}
++
++static Eina_Bool
++_cb_refresh(void *data EINA_UNUSED)
++{
++   st.refresh = NULL;
++   _read_sys();
++   _query_all(EINA_TRUE);
++   _update_all();
++   return ECORE_CALLBACK_CANCEL;
++}
++
++/* atualiza logo depois de uma ação (nmcli/bluetoothctl demoram um pouco) */
++static void
++_refresh_soon(void)
++{
++   if (st.refresh) ecore_timer_del(st.refresh);
++   st.refresh = ecore_timer_loop_add(1.0, _cb_refresh, NULL);
++}
++
++/* ------------------------------------------------------- pílula da barra */
++
++static void
++_status_update(Status *s)
++{
++   Edje_Message_Float msg;
++   char buf[32];
++
++   if (!s->o) return;
++   if (st.wifi < 0) edje_object_signal_emit(s->o, "e,wifi,none", "e");
++   else edje_object_signal_emit(s->o, st.wifi ? "e,wifi,on" : "e,wifi,off", "e");
++
++   if (st.mute || (st.vol == 0)) edje_object_signal_emit(s->o, "e,vol,mute", "e");
++   else if ((st.vol > 0) && (st.vol < 40)) edje_object_signal_emit(s->o, "e,vol,low", "e");
++   else edje_object_signal_emit(s->o, "e,vol,high", "e");
++
++   if (st.bat < 0)
++     {
++        edje_object_signal_emit(s->o, "e,bat,none", "e");
++        edje_object_part_text_set(s->o, "e.text.battery", "");
++     }
++   else
++     {
++        edje_object_signal_emit(s->o, ((st.bat <= 15) && !st.charging) ? "e,bat,low" : "e,bat,ok", "e");
++        edje_object_signal_emit(s->o, st.charging ? "e,charging,on" : "e,charging,off", "e");
++        snprintf(buf, sizeof(buf), "%i%%", st.bat);
++        edje_object_part_text_set(s->o, "e.text.battery", buf);
++        msg.val = st.bat / 100.0;
++        edje_object_message_send(s->o, EDJE_MESSAGE_FLOAT, 1, &msg);
++     }
++   edje_object_message_signal_process(s->o);
++   if (s->gcc)
++     {
++        Evas_Coord mw = 0, mh = 0, w = 0, h = 0;
++        /* o min do grupo vale como mínimo; o texto da bateria pode alargar */
++        edje_object_size_min_get(s->o, &mw, &mh);
++        edje_object_size_min_restricted_calc(s->o, &w, &h, mw, mh);
++        w = MAX(w, mw); h = MAX(h, mh);
++        e_gadcon_client_min_size_set(s->gcc, w, h);
++        e_gadcon_client_aspect_set(s->gcc, w, h);
++     }
++}
++
++/* --------------------------------------------------- central de controle */
++
++static Eina_Bool
++_module_on(const char *name)
++{
++   E_Module *m = e_module_find(name);
++   return m && e_module_enabled_get(m);
++}
++
++static void
++_module_toggle(const char *name)
++{
++   E_Module *m = e_module_find(name);
++
++   if (!m) m = e_module_new(name);
++   if (!m) return;
++   if (e_module_enabled_get(m)) e_module_disable(m);
++   else e_module_enable(m);
++   e_config_save_queue();
++}
++
++static void
++_card_set(Evas_Object *o, Eina_Bool on, const char *label, const char *sub)
++{
++   if (!o) return;
++   edje_object_signal_emit(o, on ? "e,state,on" : "e,state,off", "e");
++   edje_object_part_text_set(o, "e.text.label", label);
++   edje_object_part_text_set(o, "e.text.sub", sub);
++}
++
++static void
++_uptime_text(char *buf, size_t len)
++{
++   char s[64];
++   long t;
++
++   if (!_file_read("/proc/uptime", s, sizeof(s))) { buf[0] = 0; return; }
++   t = atol(s);
++   if (t >= 86400)
++     snprintf(buf, len, "ligado há %li d %li h", t / 86400, (t % 86400) / 3600);
++   else if (t >= 3600)
++     snprintf(buf, len, "ligado há %li h %li min", t / 3600, (t % 3600) / 60);
++   else
++     snprintf(buf, len, "ligado há %li min", t / 60);
++}
++
++static void
++_popup_update(Status *s)
++{
++   char buf[256];
++
++   /* Wi-Fi */
++   if (st.wifi < 0)
++     _card_set(s->o_card[CARD_WIFI], EINA_FALSE, "Wi-Fi", "Sem placa");
++   else if (st.wifi_radio == 0)
++     _card_set(s->o_card[CARD_WIFI], EINA_FALSE, "Wi-Fi", "Desligado");
++   else
++     _card_set(s->o_card[CARD_WIFI], EINA_TRUE, "Wi-Fi",
++               st.ssid[0] ? st.ssid : (st.wifi ? "Conectado" : "Ligado"));
++
++   /* Bluetooth */
++   if (st.bt < 0)
++     _card_set(s->o_card[CARD_BT], EINA_FALSE, "Bluetooth", "Sem adaptador");
++   else
++     _card_set(s->o_card[CARD_BT], st.bt, "Bluetooth", st.bt ? "Ligado" : "Desligado");
++
++   _card_set(s->o_card[CARD_TILING], _module_on("tiling"), "Mosaico",
++             _module_on("tiling") ? "Ligado" : "Desligado");
++   _card_set(s->o_card[CARD_DND], !_module_on("notification"), "Não perturbe",
++             _module_on("notification") ? "Desligado" : "Ligado");
++   _card_set(s->o_card[CARD_SHOT], EINA_FALSE, "Captura", "Tela ou área");
++   _card_set(s->o_card[CARD_TWEAKS], EINA_FALSE, "Ajustes", "VoidBR");
++
++   /* volume e brilho */
++   if (s->o_sliders)
++     {
++        if (st.vol >= 0)
++          {
++             if (!st.vol_busy) elm_slider_value_set(s->o_vol, MIN(st.vol, 100));
++             snprintf(buf, sizeof(buf), st.mute ? "mudo" : "%i%%", MIN(st.vol, 100));
++             edje_object_part_text_set(s->o_sliders, "e.text.volume", buf);
++          }
++        else
++          edje_object_part_text_set(s->o_sliders, "e.text.volume", "—");
++        snprintf(buf, sizeof(buf), "%i%%",
++                 (int)(elm_slider_value_get(s->o_bri) + 0.5));
++        edje_object_part_text_set(s->o_sliders, "e.text.brightness", buf);
++     }
++
++   /* rodapé */
++   if (s->o_footer)
++     {
++        if (st.bat < 0) buf[0] = 0;
++        else snprintf(buf, sizeof(buf), st.charging ? "Bateria %i%% · carregando" : "Bateria %i%%", st.bat);
++        edje_object_part_text_set(s->o_footer, "e.text.battery", buf);
++     }
++   if (s->o_header)
++     {
++        _uptime_text(buf, sizeof(buf));
++        edje_object_part_text_set(s->o_header, "e.text.sub", buf);
++     }
++}
++
++static void
++_action(const char *name, const char *params)
++{
++   E_Action *a = e_action_find(name);
++   if (a && a->func.go) a->func.go(NULL, params);
++}
++
++static void
++_cb_card(void *data, Evas_Object *obj, const char *emission EINA_UNUSED, const char *source EINA_UNUSED)
++{
++   Status *s = data;
++   Card_Id id = (Card_Id)(intptr_t)evas_object_data_get(obj, "voidbr_card");
++
++   switch (id)
++     {
++      case CARD_WIFI:
++        if (st.wifi < 0) return;
++        _run(st.wifi_radio == 0 ? "nmcli radio wifi on" : "nmcli radio wifi off");
++        st.wifi_radio = !st.wifi_radio;
++        break;
++      case CARD_BT:
++        if (st.bt < 0) return;
++        _run(st.bt ? "bluetoothctl power off" : "bluetoothctl power on");
++        st.bt = !st.bt;
++        break;
++      case CARD_TILING:
++        _module_toggle("tiling");
++        break;
++      case CARD_DND:
++        _module_toggle("notification");
++        break;
++      case CARD_SHOT:
++        _popup_del(s);
++        if (!_module_on("shot")) _module_toggle("shot");
++        _action("shot", NULL);
++        return;
++      case CARD_TWEAKS:
++        _popup_del(s);
++        e_exec(e_zone_current_get(), NULL, "voidbr-enlightenment-tweaks", NULL, NULL);
++        return;
++      default:
++        return;
++     }
++   _popup_update(s);
++   _refresh_soon();
++}
++
++static void
++_cb_button(void *data, Evas_Object *obj, const char *emission EINA_UNUSED, const char *source EINA_UNUSED)
++{
++   Status *s = data;
++   const char *what = evas_object_data_get(obj, "voidbr_button");
++
++   _popup_del(s);
++   if (!what) return;
++   if (!strcmp(what, "settings")) _action("configuration", NULL);
++   else if (!strcmp(what, "lock")) e_desklock_show(EINA_FALSE);
++   else if (!strcmp(what, "power")) _action("syscon", NULL);
++}
++
++static void
++_cb_vol_drag(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event EINA_UNUSED)
++{
++   st.vol_busy = EINA_TRUE;
++}
++
++static void
++_cb_vol(void *data, Evas_Object *obj, void *event EINA_UNUSED)
++{
++   Status *s = data;
++   char cmd[128];
++   int v = (int)(elm_slider_value_get(obj) + 0.5);
++
++   snprintf(cmd, sizeof(cmd), "wpctl set-volume @DEFAULT_AUDIO_SINK@ %i%%", v);
++   _run(cmd);
++   if (st.mute) _run("wpctl set-mute @DEFAULT_AUDIO_SINK@ 0");
++   st.vol = v;
++   st.mute = EINA_FALSE;
++   st.vol_busy = EINA_FALSE;
++   _update_all();
++   (void)s;
++}
++
++static void
++_cb_bri(void *data, Evas_Object *obj, void *event EINA_UNUSED)
++{
++   Status *s = data;
++   double v = elm_slider_value_get(obj) / 100.0;
++   E_Zone *zone = s->gcc ? s->gcc->gadcon->zone : e_zone_current_get();
++
++   if (v < 0.05) v = 0.05;
++   e_backlight_mode_set(zone, E_BACKLIGHT_MODE_NORMAL);
++   e_backlight_level_set(zone, v, 0.0);
++   e_config->backlight.normal = v;
++   e_config_save_queue();
++   _popup_update(s);
++}
++
++static Evas_Object *
++_slider_add(void)
++{
++   Evas_Object *o = elm_slider_add(e_comp->elm);
++
++   elm_slider_min_max_set(o, 0, 100);
++   elm_slider_indicator_show_set(o, EINA_FALSE);
++   elm_slider_span_size_set(o, 160);
++   evas_object_size_hint_weight_set(o, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
++   evas_object_size_hint_align_set(o, EVAS_HINT_FILL, 0.5);
++   evas_object_show(o);
++   return o;
++}
++
++static Evas_Object *
++_button_add(Status *s, const char *name)
++{
++   char grp[128];
++   Evas_Object *o;
++
++   snprintf(grp, sizeof(grp), THEME_GROUP("button/%s"), name);
++   o = _edje(e_comp->evas, grp);
++   if (!o) return NULL;
++   evas_object_data_set(o, "voidbr_button", name);
++   edje_object_signal_callback_add(o, "e,action,click", "e", _cb_button, s);
++   _min_hint(o);
++   evas_object_show(o);
++   return o;
++}
++
++static void
++_cb_popup_comp_del(void *data, Evas_Object *obj EINA_UNUSED)
++{
++   _popup_del(data);
++}
++
++static void
++_cb_popup_del(void *obj)
++{
++   Status *s = e_object_data_get(obj);
++
++   if (!s) return;
++   s->popup = NULL;
++   s->o_header = s->o_sliders = s->o_footer = NULL;
++   memset(s->o_card, 0, sizeof(s->o_card));
++   s->o_vol = s->o_bri = NULL;
++   st.vol_busy = EINA_FALSE;
++   if (s->o) edje_object_signal_emit(s->o, "e,state,passive", "e");
++}
++
++static void
++_popup_del(Status *s)
++{
++   E_FREE_FUNC(s->popup, e_object_del);
++}
++
++static void
++_popup_new(Status *s)
++{
++   static const char *cards[CARD_LAST] = { "wifi", "bluetooth", "tiling", "dnd", "shot", "tweaks" };
++   Evas_Object *box, *tb, *o;
++   const struct passwd *pw;
++   char buf[256], ini[8];
++   E_Zone *zone;
++   int i;
++
++   if (s->popup) return;
++   s->popup = e_gadcon_popup_new(s->gcc, 0);
++   if (!s->popup) return;
++   zone = s->gcc->gadcon->zone;
++
++   box = elm_box_add(e_comp->elm);
++   elm_box_padding_set(box, 0, 12);
++   elm_box_homogeneous_set(box, EINA_FALSE);
++
++   /* topo: avatar com as iniciais, nome, tempo ligado e configurações */
++   s->o_header = o = _edje(e_comp->evas, THEME_GROUP("header"));
++   if (o)
++     {
++        pw = getpwuid(getuid());
++        buf[0] = 0;
++        if (pw && pw->pw_gecos && pw->pw_gecos[0])
++          {
++             eina_strlcpy(buf, pw->pw_gecos, sizeof(buf));
++             if (strchr(buf, ',')) *strchr(buf, ',') = 0;
++          }
++        if (!buf[0] && pw) eina_strlcpy(buf, pw->pw_name, sizeof(buf));
++        edje_object_part_text_set(o, "e.text.name", buf);
++        /* iniciais: primeira letra do primeiro e do último nome */
++        ini[0] = 0;
++        if (buf[0])
++          {
++             char *last = strrchr(buf, ' ');
++             snprintf(ini, sizeof(ini), "%c%c", toupper((unsigned char)buf[0]),
++                      (last && last[1]) ? toupper((unsigned char)last[1]) : 0);
++          }
++        edje_object_part_text_set(o, "e.text.initials", ini);
++        edje_object_part_swallow(o, "e.swallow.button", _button_add(s, "settings"));
++        _min_hint(o);
++        evas_object_size_hint_align_set(o, EVAS_HINT_FILL, 0.5);
++        evas_object_show(o);
++        elm_box_pack_end(box, o);
++     }
++
++   /* cartões, 2 por linha */
++   tb = elm_table_add(e_comp->elm);
++   elm_table_padding_set(tb, 10, 10);
++   elm_table_homogeneous_set(tb, EINA_TRUE);
++   for (i = 0; i < CARD_LAST; i++)
++     {
++        snprintf(buf, sizeof(buf), THEME_GROUP("card/%s"), cards[i]);
++        s->o_card[i] = o = _edje(e_comp->evas, buf);
++        if (!o) continue;
++        evas_object_data_set(o, "voidbr_card", (void *)(intptr_t)i);
++        edje_object_signal_callback_add(o, "e,action,click", "e", _cb_card, s);
++        _min_hint(o);
++        evas_object_size_hint_weight_set(o, EVAS_HINT_EXPAND, 0);
++        evas_object_size_hint_align_set(o, EVAS_HINT_FILL, EVAS_HINT_FILL);
++        evas_object_show(o);
++        elm_table_pack(tb, o, i % 2, i / 2, 1, 1);
++     }
++   evas_object_size_hint_align_set(tb, EVAS_HINT_FILL, 0.5);
++   evas_object_show(tb);
++   elm_box_pack_end(box, tb);
++
++   /* volume e brilho */
++   s->o_sliders = o = _edje(e_comp->evas, THEME_GROUP("sliders"));
++   if (o)
++     {
++        s->o_vol = _slider_add();
++        elm_slider_value_set(s->o_vol, st.vol >= 0 ? MIN(st.vol, 100) : 0);
++        elm_object_disabled_set(s->o_vol, st.vol < 0);
++        evas_object_smart_callback_add(s->o_vol, "slider,drag,start", _cb_vol_drag, s);
++        evas_object_smart_callback_add(s->o_vol, "delay,changed", _cb_vol, s);
++        edje_object_part_swallow(o, "e.swallow.volume", s->o_vol);
++
++        s->o_bri = _slider_add();
++        e_backlight_mode_set(zone, E_BACKLIGHT_MODE_NORMAL);
++        elm_slider_value_set(s->o_bri, e_backlight_level_get(zone) * 100.0);
++        evas_object_smart_callback_add(s->o_bri, "delay,changed", _cb_bri, s);
++        edje_object_part_swallow(o, "e.swallow.brightness", s->o_bri);
++
++        _min_hint(o);
++        evas_object_size_hint_align_set(o, EVAS_HINT_FILL, 0.5);
++        evas_object_show(o);
++        elm_box_pack_end(box, o);
++     }
++
++   /* rodapé: bateria, bloquear e desligar */
++   s->o_footer = o = _edje(e_comp->evas, THEME_GROUP("footer"));
++   if (o)
++     {
++        edje_object_part_swallow(o, "e.swallow.lock", _button_add(s, "lock"));
++        edje_object_part_swallow(o, "e.swallow.power", _button_add(s, "power"));
++        _min_hint(o);
++        evas_object_size_hint_align_set(o, EVAS_HINT_FILL, 0.5);
++        evas_object_show(o);
++        elm_box_pack_end(box, o);
++     }
++
++   _popup_update(s);
++   evas_object_show(box);
++   e_gadcon_popup_content_set(s->popup, box);
++   e_gadcon_popup_show(s->popup);
++   e_comp_object_util_autoclose(s->popup->comp_object, _cb_popup_comp_del, NULL, s);
++   e_object_data_set(E_OBJECT(s->popup), s);
++   E_OBJECT_DEL_SET(s->popup, _cb_popup_del);
++   edje_object_signal_emit(s->o, "e,state,active", "e");
++
++   _query_all(EINA_TRUE);
++}
++
++static void
++_cb_status_mouse_down(void *data, Evas *evas EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event)
++{
++   Status *s = data;
++   Evas_Event_Mouse_Down *ev = event;
++
++   if (ev->button == 1)
++     {
++        if (s->popup) _popup_del(s);
++        else _popup_new(s);
++     }
++   else if (ev->button == 3)
++     {
++        E_Menu *m;
++        int x, y;
++
++        m = e_menu_new();
++        m = e_gadcon_client_util_menu_items_append(s->gcc, m, 0);
++        e_gadcon_canvas_zone_geometry_get(s->gcc->gadcon, &x, &y, NULL, NULL);
++        e_menu_activate_mouse(m, e_zone_current_get(), x + ev->output.x, y + ev->output.y,
++                              1, 1, E_MENU_POP_DIRECTION_AUTO, ev->timestamp);
++        evas_event_feed_mouse_up(s->gcc->gadcon->evas, ev->button,
++                                 EVAS_BUTTON_NONE, ev->timestamp, NULL);
++     }
++}
++
++static void
++_cb_status_wheel(void *data EINA_UNUSED, Evas *evas EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event)
++{
++   Evas_Event_Mouse_Wheel *ev = event;
++
++   if (st.vol < 0) return;
++   _run(ev->z < 0 ? "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+"
++                  : "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-");
++   st.vol = MAX(0, MIN(100, st.vol + (ev->z < 0 ? 5 : -5)));
++   _update_all();
++}
++
++/* ------------------------------------------------------ gadget: status */
++
++static E_Gadcon_Client *
++_st_init(E_Gadcon *gc, const char *name, const char *id, const char *style)
++{
++   Status *s;
++   Evas_Object *o;
++
++   o = _edje(gc->evas, THEME_GROUP("status"));
++   if (!o) return NULL;
++   s = E_NEW(Status, 1);
++   s->o = o;
++   evas_object_show(o);
++   s->gcc = e_gadcon_client_new(gc, name, id, style, o);
++   s->gcc->data = s;
++   evas_object_event_callback_add(o, EVAS_CALLBACK_MOUSE_DOWN, _cb_status_mouse_down, s);
++   evas_object_event_callback_add(o, EVAS_CALLBACK_MOUSE_WHEEL, _cb_status_wheel, s);
++   st.status = eina_list_append(st.status, s);
++   _status_update(s);
++   return s->gcc;
++}
++
++static void
++_st_shutdown(E_Gadcon_Client *gcc)
++{
++   Status *s = gcc->data;
++
++   _popup_del(s);
++   st.status = eina_list_remove(st.status, s);
++   evas_object_del(s->o);
++   free(s);
++}
++
++static void
++_st_orient(E_Gadcon_Client *gcc, E_Gadcon_Orient orient EINA_UNUSED)
++{
++   _status_update(gcc->data);
++}
++
++static const char *
++_st_label(const E_Gadcon_Client_Class *cc EINA_UNUSED)
++{
++   return "VoidBR: status e central de controle";
++}
++
++static Evas_Object *
++_icon(Evas *evas)
++{
++   return e_util_icon_theme_icon_add("preferences-system", 48, evas);
++}
++
++static Evas_Object *
++_st_icon(const E_Gadcon_Client_Class *cc EINA_UNUSED, Evas *evas)
++{
++   return _icon(evas);
++}
++
++static const char *
++_st_id_new(const E_Gadcon_Client_Class *cc)
++{
++   static char buf[64];
++   snprintf(buf, sizeof(buf), "%s.%d", cc->name, eina_list_count(st.status) + 1);
++   return buf;
++}
++
++static const E_Gadcon_Client_Class _class_status =
++{
++   GADCON_CLIENT_CLASS_VERSION, "voidbr-status",
++   { _st_init, _st_shutdown, _st_orient, _st_label, _st_icon, _st_id_new, NULL, NULL },
++   E_GADCON_CLIENT_STYLE_PLAIN
++};
++
++/* ------------------------------------------------------- gadget: título */
++
++static void
++_title_update_all(void)
++{
++   E_Client *ec = e_client_focused_get();
++   const char *t = (ec && !e_client_util_ignored_get(ec)) ? e_client_util_name_get(ec) : NULL;
++   Eina_List *l;
++   Title *ti;
++
++   EINA_LIST_FOREACH(st.titles, l, ti)
++     edje_object_part_text_set(ti->o, "e.text.title", t ? t : "");
++}
++
++static Eina_Bool
++_cb_client(void *data EINA_UNUSED, int type, void *event)
++{
++   if (type == E_EVENT_CLIENT_PROPERTY)
++     {
++        E_Event_Client_Property *ev = event;
++        if (!(ev->property & E_CLIENT_PROPERTY_TITLE)) return ECORE_CALLBACK_PASS_ON;
++        if (ev->ec != e_client_focused_get()) return ECORE_CALLBACK_PASS_ON;
++     }
++   _title_update_all();
++   return ECORE_CALLBACK_PASS_ON;
++}
++
++static E_Gadcon_Client *
++_ti_init(E_Gadcon *gc, const char *name, const char *id, const char *style)
++{
++   Title *ti;
++   Evas_Object *o;
++
++   o = _edje(gc->evas, THEME_GROUP("title"));
++   if (!o) return NULL;
++   ti = E_NEW(Title, 1);
++   ti->o = o;
++   evas_object_show(o);
++   ti->gcc = e_gadcon_client_new(gc, name, id, style, o);
++   ti->gcc->data = ti;
++   st.titles = eina_list_append(st.titles, ti);
++   _title_update_all();
++   return ti->gcc;
++}
++
++static void
++_ti_shutdown(E_Gadcon_Client *gcc)
++{
++   Title *ti = gcc->data;
++
++   st.titles = eina_list_remove(st.titles, ti);
++   evas_object_del(ti->o);
++   free(ti);
++}
++
++static void
++_ti_orient(E_Gadcon_Client *gcc, E_Gadcon_Orient orient EINA_UNUSED)
++{
++   /* largura fixa: o título não empurra os outros gadgets */
++   e_gadcon_client_min_size_set(gcc, 280 * e_scale, 16);
++   e_gadcon_client_aspect_set(gcc, 0, 0);
++}
++
++static const char *
++_ti_label(const E_Gadcon_Client_Class *cc EINA_UNUSED)
++{
++   return "VoidBR: título da janela";
++}
++
++static Evas_Object *
++_ti_icon(const E_Gadcon_Client_Class *cc EINA_UNUSED, Evas *evas)
++{
++   return _icon(evas);
++}
++
++static const char *
++_ti_id_new(const E_Gadcon_Client_Class *cc)
++{
++   static char buf[64];
++   snprintf(buf, sizeof(buf), "%s.%d", cc->name, eina_list_count(st.titles) + 1);
++   return buf;
++}
++
++static const E_Gadcon_Client_Class _class_title =
++{
++   GADCON_CLIENT_CLASS_VERSION, "voidbr-title",
++   { _ti_init, _ti_shutdown, _ti_orient, _ti_label, _ti_icon, _ti_id_new, NULL, NULL },
++   E_GADCON_CLIENT_STYLE_PLAIN
++};
++
++/* ---------------------------------------------------------------- módulo */
++
++E_API E_Module_Api e_modapi = { E_MODULE_API_VERSION, "VoidBR" };
++
++E_API void *
++e_modapi_init(E_Module *m)
++{
++   st.module = m;
++   st.wifi = st.wifi_radio = st.bt = st.vol = st.bat = -1;
++   _read_sys();
++   E_LIST_HANDLER_APPEND(st.handlers, ECORE_EXE_EVENT_DATA, _cb_exe_data, NULL);
++   E_LIST_HANDLER_APPEND(st.handlers, E_EVENT_CLIENT_FOCUS_IN, _cb_client, NULL);
++   E_LIST_HANDLER_APPEND(st.handlers, E_EVENT_CLIENT_FOCUS_OUT, _cb_client, NULL);
++   E_LIST_HANDLER_APPEND(st.handlers, E_EVENT_CLIENT_REMOVE, _cb_client, NULL);
++   E_LIST_HANDLER_APPEND(st.handlers, E_EVENT_CLIENT_PROPERTY, _cb_client, NULL);
++   e_gadcon_provider_register(&_class_status);
++   e_gadcon_provider_register(&_class_title);
++   st.poll = ecore_timer_loop_add(3.0, _cb_poll, NULL);
++   _query_all(EINA_TRUE);
++   return m;
++}
++
++E_API int
++e_modapi_shutdown(E_Module *m EINA_UNUSED)
++{
++   e_gadcon_provider_unregister(&_class_title);
++   e_gadcon_provider_unregister(&_class_status);
++   E_FREE_LIST(st.handlers, ecore_event_handler_del);
++   E_FREE_FUNC(st.poll, ecore_timer_del);
++   E_FREE_FUNC(st.refresh, ecore_timer_del);
++   st.module = NULL;
++   return 1;
++}
++
++E_API int
++e_modapi_save(E_Module *m EINA_UNUSED)
++{
++   return 1;
++}
+diff -ruN a/src/modules/voidbr/meson.build b/src/modules/voidbr/meson.build
+--- a/src/modules/voidbr/meson.build	1969-12-31 20:00:00.000000000 -0400
++++ b/src/modules/voidbr/meson.build	2026-11-08 23:02:25.062438002 -0400
+@@ -0,0 +1,5 @@
++src = files(
++  'e_mod_main.c'
++)
++no_icon = true
++data = [ 'module.desktop' ]
+diff -ruN a/src/modules/voidbr/module.desktop b/src/modules/voidbr/module.desktop
+--- a/src/modules/voidbr/module.desktop	1969-12-31 20:00:00.000000000 -0400
++++ b/src/modules/voidbr/module.desktop	2026-11-08 23:02:25.063766681 -0400
+@@ -0,0 +1,8 @@
++[Desktop Entry]
++Type=Link
++Name=VoidBR
++Name[pt_BR]=VoidBR
++Comment=Status bar pill, control center and active window title for VoidBR.
++Comment[pt_BR]=Pílula de status, central de controle e título da janela ativa do VoidBR.
++Icon=preferences-system
++X-Enlightenment-ModuleType=utils
