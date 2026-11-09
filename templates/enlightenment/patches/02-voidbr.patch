@@ -98,8 +98,8 @@ diff -ruN a/src/modules/meson.build b/src/modules/meson.build
    'cpufreq',
 diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 --- a/src/modules/voidbr/e_mod_main.c	1969-12-31 20:00:00.000000000 -0400
-+++ b/src/modules/voidbr/e_mod_main.c	2026-11-09 14:33:28.116157101 -0400
-@@ -0,0 +1,1017 @@
++++ b/src/modules/voidbr/e_mod_main.c	2026-11-09 14:47:23.651077470 -0400
+@@ -0,0 +1,1050 @@
 +/*
 + * Módulo "voidbr" do Enlightenment (VoidBR Linux)
 + *
@@ -146,6 +146,7 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   Evas_Object     *o_header, *o_sliders, *o_footer;
 +   Evas_Object     *o_card[CARD_LAST];
 +   Evas_Object     *o_vol, *o_bri;
++   Evas_Object     *o_settings, *o_lock, *o_power;
 +} Status;
 +
 +typedef struct
@@ -207,6 +208,33 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +        edje_object_part_unswallow(obj, c);
 +        evas_object_del(c);
 +     }
++}
++
++static void
++_cb_ptr_null(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event EINA_UNUSED)
++{
++   Evas_Object **ptr = data;
++   *ptr = NULL;
++}
++
++/* guarda o objeto em *ptr e zera *ptr quando ele for apagado por outro caminho */
++static Evas_Object *
++_track(Evas_Object **ptr, Evas_Object *o)
++{
++   *ptr = o;
++   if (o) evas_object_event_callback_add(o, EVAS_CALLBACK_DEL, _cb_ptr_null, ptr);
++   return o;
++}
++
++static void
++_untrack_del(Evas_Object **ptr)
++{
++   Evas_Object *o = *ptr;
++
++   if (!o) return;
++   evas_object_event_callback_del_full(o, EVAS_CALLBACK_DEL, _cb_ptr_null, ptr);
++   *ptr = NULL;
++   evas_object_del(o);
 +}
 +
 +static const char *_parts_header[] = { "e.swallow.button", NULL };
@@ -743,9 +771,14 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +
 +   if (!s) return;
 +   s->popup = NULL;
++   /* o que fica dentro dos painéis (swallow) não morre junto com eles: apaga aqui */
++   _untrack_del(&s->o_settings);
++   _untrack_del(&s->o_lock);
++   _untrack_del(&s->o_power);
++   _untrack_del(&s->o_vol);
++   _untrack_del(&s->o_bri);
 +   s->o_header = s->o_sliders = s->o_footer = NULL;
 +   memset(s->o_card, 0, sizeof(s->o_card));
-+   s->o_vol = s->o_bri = NULL;
 +   st.vol_busy = EINA_FALSE;
 +   if (s->o) edje_object_signal_emit(s->o, "e,state,passive", "e");
 +}
@@ -797,7 +830,7 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +                      (last && last[1]) ? toupper((unsigned char)last[1]) : 0);
 +          }
 +        edje_object_part_text_set(o, "e.text.initials", ini);
-+        edje_object_part_swallow(o, "e.swallow.button", _button_add(s, "settings"));
++        edje_object_part_swallow(o, "e.swallow.button", _track(&s->o_settings, _button_add(s, "settings")));
 +        _swallows_owned(o, _parts_header);
 +        _min_hint(o);
 +        evas_object_size_hint_align_set(o, EVAS_HINT_FILL, 0.5);
@@ -830,14 +863,14 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   s->o_sliders = o = _edje(e_comp->evas, THEME_GROUP("sliders"));
 +   if (o)
 +     {
-+        s->o_vol = _slider_add();
++        _track(&s->o_vol, _slider_add());
 +        elm_slider_value_set(s->o_vol, st.vol >= 0 ? MIN(st.vol, 100) : 0);
 +        elm_object_disabled_set(s->o_vol, st.vol < 0);
 +        evas_object_smart_callback_add(s->o_vol, "slider,drag,start", _cb_vol_drag, s);
 +        evas_object_smart_callback_add(s->o_vol, "delay,changed", _cb_vol, s);
 +        edje_object_part_swallow(o, "e.swallow.volume", s->o_vol);
 +
-+        s->o_bri = _slider_add();
++        _track(&s->o_bri, _slider_add());
 +        e_backlight_mode_set(zone, E_BACKLIGHT_MODE_NORMAL);
 +        elm_slider_value_set(s->o_bri, _backlight_has() ? e_backlight_level_get(zone) * 100.0 : 0);
 +        elm_object_disabled_set(s->o_bri, !_backlight_has());
@@ -855,8 +888,8 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   s->o_footer = o = _edje(e_comp->evas, THEME_GROUP("footer"));
 +   if (o)
 +     {
-+        edje_object_part_swallow(o, "e.swallow.lock", _button_add(s, "lock"));
-+        edje_object_part_swallow(o, "e.swallow.power", _button_add(s, "power"));
++        edje_object_part_swallow(o, "e.swallow.lock", _track(&s->o_lock, _button_add(s, "lock")));
++        edje_object_part_swallow(o, "e.swallow.power", _track(&s->o_power, _button_add(s, "power")));
 +        _swallows_owned(o, _parts_footer);
 +        _min_hint(o);
 +        evas_object_size_hint_align_set(o, EVAS_HINT_FILL, 0.5);
