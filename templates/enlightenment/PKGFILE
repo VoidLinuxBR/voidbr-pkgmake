@@ -14,7 +14,7 @@
 
 pkgname=enlightenment
 pkgver=0.28.0
-pkgrel=5
+pkgrel=6
 pkgdesc='Enlightenment desktop shell'
 arch=(x86_64 aarch64)
 url=https://www.enlightenment.org

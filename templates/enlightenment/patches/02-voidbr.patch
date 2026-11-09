@@ -98,8 +98,8 @@ diff -ruN a/src/modules/meson.build b/src/modules/meson.build
    'cpufreq',
 diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 --- a/src/modules/voidbr/e_mod_main.c	1969-12-31 20:00:00.000000000 -0400
-+++ b/src/modules/voidbr/e_mod_main.c	2026-11-09 14:47:23.651077470 -0400
-@@ -0,0 +1,1050 @@
++++ b/src/modules/voidbr/e_mod_main.c	2026-11-09 14:59:37.192603171 -0400
+@@ -0,0 +1,1082 @@
 +/*
 + * Módulo "voidbr" do Enlightenment (VoidBR Linux)
 + *
@@ -125,6 +125,9 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +
 +#define THEME_GROUP(_g) "e/modules/voidbr/" _g
 +
++/* revisão do módulo: grep -a voidbr-mod-rev .../modules/voidbr/*/module.so */
++__attribute__((used)) static const char _voidbr_rev[] = "voidbr-mod-rev-6";
++
 +/* -------------------------------------------------------------- estado */
 +
 +typedef enum
@@ -147,6 +150,7 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   Evas_Object     *o_card[CARD_LAST];
 +   Evas_Object     *o_vol, *o_bri;
 +   Evas_Object     *o_settings, *o_lock, *o_power;
++   Evas_Object     *o_box, *o_table;
 +} Status;
 +
 +typedef struct
@@ -758,6 +762,37 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   return o;
 +}
 +
++/* apaga tudo o que a central criou, de dentro para fora; seguro chamar 2 vezes */
++static void
++_popup_cleanup(Status *s)
++{
++   int i;
++
++   _untrack_del(&s->o_settings);
++   _untrack_del(&s->o_lock);
++   _untrack_del(&s->o_power);
++   _untrack_del(&s->o_vol);
++   _untrack_del(&s->o_bri);
++   for (i = 0; i < CARD_LAST; i++) _untrack_del(&s->o_card[i]);
++   _untrack_del(&s->o_header);
++   _untrack_del(&s->o_sliders);
++   _untrack_del(&s->o_footer);
++   _untrack_del(&s->o_table);
++   _untrack_del(&s->o_box);
++   st.vol_busy = EINA_FALSE;
++}
++
++/* o quadro do popup foi apagado (qualquer caminho): limpa também */
++static void
++_cb_popup_frame_del(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event EINA_UNUSED)
++{
++   Status *s = data;
++
++   _popup_cleanup(s);
++   s->popup = NULL;
++   if (s->o) edje_object_signal_emit(s->o, "e,state,passive", "e");
++}
++
 +static void
 +_cb_popup_comp_del(void *data, Evas_Object *obj EINA_UNUSED)
 +{
@@ -770,16 +805,11 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   Status *s = e_object_data_get(obj);
 +
 +   if (!s) return;
++   if (s->popup && s->popup->comp_object)
++     evas_object_event_callback_del_full(s->popup->comp_object, EVAS_CALLBACK_DEL,
++                                         _cb_popup_frame_del, s);
 +   s->popup = NULL;
-+   /* o que fica dentro dos painéis (swallow) não morre junto com eles: apaga aqui */
-+   _untrack_del(&s->o_settings);
-+   _untrack_del(&s->o_lock);
-+   _untrack_del(&s->o_power);
-+   _untrack_del(&s->o_vol);
-+   _untrack_del(&s->o_bri);
-+   s->o_header = s->o_sliders = s->o_footer = NULL;
-+   memset(s->o_card, 0, sizeof(s->o_card));
-+   st.vol_busy = EINA_FALSE;
++   _popup_cleanup(s);
 +   if (s->o) edje_object_signal_emit(s->o, "e,state,passive", "e");
 +}
 +
@@ -804,12 +834,12 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   if (!s->popup) return;
 +   zone = s->gcc->gadcon->zone;
 +
-+   box = elm_box_add(e_comp->elm);
++   box = _track(&s->o_box, elm_box_add(e_comp->elm));
 +   elm_box_padding_set(box, 0, 12);
 +   elm_box_homogeneous_set(box, EINA_FALSE);
 +
 +   /* topo: avatar com as iniciais, nome, tempo ligado e configurações */
-+   s->o_header = o = _edje(e_comp->evas, THEME_GROUP("header"));
++   o = _track(&s->o_header, _edje(e_comp->evas, THEME_GROUP("header")));
 +   if (o)
 +     {
 +        pw = getpwuid(getuid());
@@ -839,13 +869,13 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +     }
 +
 +   /* cartões, 2 por linha */
-+   tb = elm_table_add(e_comp->elm);
++   tb = _track(&s->o_table, elm_table_add(e_comp->elm));
 +   elm_table_padding_set(tb, 10, 10);
 +   elm_table_homogeneous_set(tb, EINA_TRUE);
 +   for (i = 0; i < CARD_LAST; i++)
 +     {
 +        snprintf(buf, sizeof(buf), THEME_GROUP("card/%s"), cards[i]);
-+        s->o_card[i] = o = _edje(e_comp->evas, buf);
++        o = _track(&s->o_card[i], _edje(e_comp->evas, buf));
 +        if (!o) continue;
 +        evas_object_data_set(o, "voidbr_card", (void *)(intptr_t)i);
 +        edje_object_signal_callback_add(o, "e,action,click", "e", _cb_card, s);
@@ -860,7 +890,7 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   elm_box_pack_end(box, tb);
 +
 +   /* volume e brilho */
-+   s->o_sliders = o = _edje(e_comp->evas, THEME_GROUP("sliders"));
++   o = _track(&s->o_sliders, _edje(e_comp->evas, THEME_GROUP("sliders")));
 +   if (o)
 +     {
 +        _track(&s->o_vol, _slider_add());
@@ -885,7 +915,7 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +     }
 +
 +   /* rodapé: bateria, bloquear e desligar */
-+   s->o_footer = o = _edje(e_comp->evas, THEME_GROUP("footer"));
++   o = _track(&s->o_footer, _edje(e_comp->evas, THEME_GROUP("footer")));
 +   if (o)
 +     {
 +        edje_object_part_swallow(o, "e.swallow.lock", _track(&s->o_lock, _button_add(s, "lock")));
@@ -904,6 +934,8 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   e_comp_object_util_autoclose(s->popup->comp_object, _cb_popup_comp_del, NULL, s);
 +   e_object_data_set(E_OBJECT(s->popup), s);
 +   E_OBJECT_DEL_SET(s->popup, _cb_popup_del);
++   evas_object_event_callback_add(s->popup->comp_object, EVAS_CALLBACK_DEL,
++                                  _cb_popup_frame_del, s);
 +   edje_object_signal_emit(s->o, "e,state,active", "e");
 +
 +   _query_all(EINA_TRUE);
