@@ -98,8 +98,8 @@ diff -ruN a/src/modules/meson.build b/src/modules/meson.build
    'cpufreq',
 diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 --- a/src/modules/voidbr/e_mod_main.c	1969-12-31 20:00:00.000000000 -0400
-+++ b/src/modules/voidbr/e_mod_main.c	2026-11-08 23:02:25.060991861 -0400
-@@ -0,0 +1,936 @@
++++ b/src/modules/voidbr/e_mod_main.c	2026-11-08 23:43:32.834568411 -0400
+@@ -0,0 +1,986 @@
 +/*
 + * Módulo "voidbr" do Enlightenment (VoidBR Linux)
 + *
@@ -115,12 +115,13 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 + * (voidbr-enlightenment-config, src/theme/central.edc).
 + *
 + * Wi-Fi e Bluetooth usam nmcli e bluetoothctl; o volume usa wpctl
-+ * (PipeWire). Se um deles não existir, o item correspondente some ou
++ * (PipeWire) ou, na falta dele, pactl. Se um deles não existir, o item correspondente some ou
 + * fica sem efeito. O brilho usa o backlight do próprio E.
 + */
 +#include "e.h"
 +#include <pwd.h>
 +#include <dirent.h>
++#include <ctype.h>
 +
 +#define THEME_GROUP(_g) "e/modules/voidbr/" _g
 +
@@ -213,6 +214,17 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   return EINA_TRUE;
 +}
 +
++/* tela com brilho ajustável? (VMs e desktops costumam não ter) */
++static Eina_Bool
++_backlight_has(void)
++{
++   Eina_List *l = ecore_file_ls("/sys/class/backlight");
++   Eina_Bool has = !!l;
++
++   E_FREE_LIST(l, free);
++   return has && e_backlight_exists();
++}
++
 +static void
 +_run(const char *cmd)
 +{
@@ -281,7 +293,8 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +_query_all(Eina_Bool slow)
 +{
 +   if (!st.vol_busy)
-+     _query("vol", "wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null");
++     _query("vol", "wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null || "
++                   "{ pactl get-sink-volume @DEFAULT_SINK@; pactl get-sink-mute @DEFAULT_SINK@; } 2>/dev/null");
 +   if (slow)
 +     {
 +        _query("radio", "nmcli radio wifi 2>/dev/null");
@@ -316,13 +329,28 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +
 +   if (!strcmp(tag, "vol"))
 +     {
-+        /* "Volume: 0.70 [MUTED]" */
++        /* wpctl: "Volume: 0.70 [MUTED]"
++         * pactl: "Volume: front-left: 45875 /  70% / ..." e "Mute: yes" */
 +        for (i = 0; ev->lines[i].line; i++)
 +          {
-+             const char *p = strstr(ev->lines[i].line, "Volume:");
-+             if (!p) continue;
-+             st.vol = (int)(atof(p + 7) * 100.0 + 0.5);
-+             st.mute = !!strstr(p, "MUTED");
++             const char *l = ev->lines[i].line, *p, *pc;
++
++             if (!strncmp(l, "Mute:", 5))
++               {
++                  st.mute = !!strstr(l, "yes");
++                  continue;
++               }
++             if (!(p = strstr(l, "Volume:"))) continue;
++             if ((pc = strchr(p, '%')))
++               {
++                  while ((pc > p) && isdigit((unsigned char)pc[-1])) pc--;
++                  st.vol = atoi(pc);
++               }
++             else
++               {
++                  st.vol = (int)(atof(p + 7) * 100.0 + 0.5);
++                  st.mute = !!strstr(p, "MUTED");
++               }
 +          }
 +     }
 +   else if (!strcmp(tag, "radio"))
@@ -414,13 +442,25 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   edje_object_message_signal_process(s->o);
 +   if (s->gcc)
 +     {
-+        Evas_Coord mw = 0, mh = 0, w = 0, h = 0;
-+        /* o min do grupo vale como mínimo; o texto da bateria pode alargar */
++        /* largura pelo que aparece (mesmas medidas do grupo status do tema):
++         * margem 10, ícones de 16 (bateria 20) separados por 10, texto, margem 12 */
++        Evas_Coord mw = 0, mh = 0, w;
++        const Evas_Object *tx;
++
 +        edje_object_size_min_get(s->o, &mw, &mh);
-+        edje_object_size_min_restricted_calc(s->o, &w, &h, mw, mh);
-+        w = MAX(w, mw); h = MAX(h, mh);
-+        e_gadcon_client_min_size_set(s->gcc, w, h);
-+        e_gadcon_client_aspect_set(s->gcc, w, h);
++        w = (st.wifi >= 0) ? (10 + 16 + 10) : (4 + 10);
++        w += 16;
++        if (st.bat >= 0)
++          {
++             w += 10 + 20 + 5;
++             tx = edje_object_part_object_get(s->o, "e.text.battery");
++             if (tx) w += evas_object_text_horiz_advance_get(tx) / e_scale;
++          }
++        w += 12;
++        w = w * e_scale;
++        if (mh < 1) mh = 28 * e_scale;
++        e_gadcon_client_min_size_set(s->gcc, w, mh);
++        e_gadcon_client_aspect_set(s->gcc, w, mh);
 +     }
 +}
 +
@@ -508,9 +548,14 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +          }
 +        else
 +          edje_object_part_text_set(s->o_sliders, "e.text.volume", "—");
-+        snprintf(buf, sizeof(buf), "%i%%",
-+                 (int)(elm_slider_value_get(s->o_bri) + 0.5));
-+        edje_object_part_text_set(s->o_sliders, "e.text.brightness", buf);
++        if (_backlight_has())
++          {
++             snprintf(buf, sizeof(buf), "%i%%",
++                      (int)(elm_slider_value_get(s->o_bri) + 0.5));
++             edje_object_part_text_set(s->o_sliders, "e.text.brightness", buf);
++          }
++        else
++          edje_object_part_text_set(s->o_sliders, "e.text.brightness", "—");
 +     }
 +
 +   /* rodapé */
@@ -600,9 +645,11 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   char cmd[128];
 +   int v = (int)(elm_slider_value_get(obj) + 0.5);
 +
-+   snprintf(cmd, sizeof(cmd), "wpctl set-volume @DEFAULT_AUDIO_SINK@ %i%%", v);
++   snprintf(cmd, sizeof(cmd), "wpctl set-volume @DEFAULT_AUDIO_SINK@ %i%% 2>/dev/null || "
++            "pactl set-sink-volume @DEFAULT_SINK@ %i%%", v, v);
 +   _run(cmd);
-+   if (st.mute) _run("wpctl set-mute @DEFAULT_AUDIO_SINK@ 0");
++   if (st.mute)
++     _run("wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 2>/dev/null || pactl set-sink-mute @DEFAULT_SINK@ 0");
 +   st.vol = v;
 +   st.mute = EINA_FALSE;
 +   st.vol_busy = EINA_FALSE;
@@ -763,7 +810,8 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +
 +        s->o_bri = _slider_add();
 +        e_backlight_mode_set(zone, E_BACKLIGHT_MODE_NORMAL);
-+        elm_slider_value_set(s->o_bri, e_backlight_level_get(zone) * 100.0);
++        elm_slider_value_set(s->o_bri, _backlight_has() ? e_backlight_level_get(zone) * 100.0 : 0);
++        elm_object_disabled_set(s->o_bri, !_backlight_has());
 +        evas_object_smart_callback_add(s->o_bri, "delay,changed", _cb_bri, s);
 +        edje_object_part_swallow(o, "e.swallow.brightness", s->o_bri);
 +
@@ -829,8 +877,10 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   Evas_Event_Mouse_Wheel *ev = event;
 +
 +   if (st.vol < 0) return;
-+   _run(ev->z < 0 ? "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+"
-+                  : "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-");
++   _run(ev->z < 0 ? "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+ 2>/dev/null || "
++                    "pactl set-sink-volume @DEFAULT_SINK@ +5%"
++                  : "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%- 2>/dev/null || "
++                    "pactl set-sink-volume @DEFAULT_SINK@ -5%");
 +   st.vol = MAX(0, MIN(100, st.vol + (ev->z < 0 ? 5 : -5)));
 +   _update_all();
 +}
