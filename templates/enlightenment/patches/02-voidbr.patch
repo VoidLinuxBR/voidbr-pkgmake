@@ -98,8 +98,8 @@ diff -ruN a/src/modules/meson.build b/src/modules/meson.build
    'cpufreq',
 diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 --- a/src/modules/voidbr/e_mod_main.c	1969-12-31 20:00:00.000000000 -0400
-+++ b/src/modules/voidbr/e_mod_main.c	2026-11-10 02:52:07.242339340 -0400
-@@ -0,0 +1,1158 @@
++++ b/src/modules/voidbr/e_mod_main.c	2026-11-10 02:58:47.341745912 -0400
+@@ -0,0 +1,1374 @@
 +/*
 + * Módulo "voidbr" do Enlightenment (VoidBR Linux)
 + *
@@ -122,11 +122,14 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +#include <pwd.h>
 +#include <dirent.h>
 +#include <ctype.h>
++#include <ifaddrs.h>
++#include <arpa/inet.h>
++#include <netinet/in.h>
 +
 +#define THEME_GROUP(_g) "e/modules/voidbr/" _g
 +
 +/* revisão do módulo (grep -a voidbr-mod-rev no module.so instalado) */
-+__attribute__((used)) static const char _voidbr_rev[] = "voidbr-mod-rev-9";
++__attribute__((used)) static const char _voidbr_rev[] = "voidbr-mod-rev-10";
 +
 +/* -------------------------------------------------------------- estado */
 +
@@ -136,6 +139,10 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   CARD_BT,
 +   CARD_TILING,
 +   CARD_DND,
++   CARD_MIC,
++   CARD_CAFFEINE,
++   CARD_NIGHT,
++   CARD_AIRPLANE,
 +   CARD_SHOT,
 +   CARD_TWEAKS,
 +   CARD_LAST
@@ -169,6 +176,11 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   int          wifi_radio; /* -1 sem nmcli, 0 desligado, 1 ligado */
 +   char         ssid[128];
 +   int          bt;         /* -1 sem controlador, 0 desligado, 1 ligado */
++   int          eth;        /* -1 sem placa cabeada, 0 desconectada, 1 conectada */
++   char         eth_if[32];
++   char         eth_ip[64];
++   int          mic;        /* -1 sem microfone, 0 mudo, 1 ligado */
++   Eina_Bool    night;      /* luz noturna ligada */
 +   int          vol;        /* -1 sem wpctl, 0..150 */
 +   Eina_Bool    mute;
 +   int          bat;        /* -1 sem bateria, 0..100 */
@@ -327,6 +339,47 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +        closedir(d);
 +     }
 +
++   /* rede cabeada: interface física (tem "device"), sem fio não, "lo" não */
++   st.eth = -1;
++   st.eth_if[0] = st.eth_ip[0] = 0;
++   if ((d = opendir("/sys/class/net")))
++     {
++        while ((de = readdir(d)))
++          {
++             if ((de->d_name[0] == '.') || (!strcmp(de->d_name, "lo"))) continue;
++             snprintf(path, sizeof(path), "/sys/class/net/%s/wireless", de->d_name);
++             if (ecore_file_is_dir(path)) continue;
++             snprintf(path, sizeof(path), "/sys/class/net/%s/device", de->d_name);
++             if (!ecore_file_exists(path)) continue;
++             if (st.eth < 0) st.eth = 0;
++             snprintf(path, sizeof(path), "/sys/class/net/%s/operstate", de->d_name);
++             if (_file_read(path, buf, sizeof(buf)) && !strcmp(buf, "up"))
++               {
++                  st.eth = 1;
++                  eina_strlcpy(st.eth_if, de->d_name, sizeof(st.eth_if));
++                  break;
++               }
++          }
++        closedir(d);
++     }
++   if (st.eth_if[0])
++     {
++        struct ifaddrs *ifa, *i;
++
++        if (!getifaddrs(&ifa))
++          {
++             for (i = ifa; i; i = i->ifa_next)
++               {
++                  if ((!i->ifa_addr) || (i->ifa_addr->sa_family != AF_INET)) continue;
++                  if (strcmp(i->ifa_name, st.eth_if)) continue;
++                  inet_ntop(AF_INET, &((struct sockaddr_in *)i->ifa_addr)->sin_addr,
++                            st.eth_ip, sizeof(st.eth_ip));
++                  break;
++               }
++             freeifaddrs(ifa);
++          }
++     }
++
 +   /* bateria */
 +   st.bat = -1;
 +   st.charging = EINA_FALSE;
@@ -355,6 +408,8 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   if (!st.vol_busy)
 +     _query("vol", "wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null || "
 +                   "{ pactl get-sink-volume @DEFAULT_SINK@; pactl get-sink-mute @DEFAULT_SINK@; } 2>/dev/null");
++   _query("mic", "wpctl get-volume @DEFAULT_AUDIO_SOURCE@ 2>/dev/null || "
++                 "pactl get-source-mute @DEFAULT_SOURCE@ 2>/dev/null");
 +   if (slow)
 +     {
 +        _query("radio", "nmcli radio wifi 2>/dev/null");
@@ -411,6 +466,17 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +                  st.vol = (int)(atof(p + 7) * 100.0 + 0.5);
 +                  st.mute = !!strstr(p, "MUTED");
 +               }
++          }
++     }
++   else if (!strcmp(tag, "mic"))
++     {
++        /* wpctl: "Volume: 1.00 [MUTED]"; pactl: "Mute: yes" */
++        for (i = 0; ev->lines[i].line; i++)
++          {
++             const char *l = ev->lines[i].line;
++
++             if (strstr(l, "Volume:")) st.mic = strstr(l, "MUTED") ? 0 : 1;
++             else if (!strncmp(l, "Mute:", 5)) st.mic = strstr(l, "yes") ? 0 : 1;
 +          }
 +     }
 +   else if (!strcmp(tag, "radio"))
@@ -572,13 +638,93 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +     snprintf(buf, len, "ligado há %li min", t / 60);
 +}
 +
++/* ------------------------------------------------- luz noturna e avião */
++
++/* luz noturna: gamma mais quente em todas as saídas ligadas (verde e azul
++ * reduzidos). O estado fica em ~/.e/e/voidbr.night, para voltar depois de
++ * reiniciar o E ou entrar de novo. */
++static void
++_night_apply(Eina_Bool on)
++{
++#ifndef HAVE_WAYLAND_ONLY
++   Ecore_X_Randr_Crtc *crtcs;
++   int i, j, n = 0, size;
++
++   if ((!e_comp) || (e_comp->comp_type != E_PIXMAP_TYPE_X)) return;
++   crtcs = ecore_x_randr_crtcs_get(e_comp->root, &n);
++   if (!crtcs) return;
++   for (i = 0; i < n; i++)
++     {
++        Ecore_X_Randr_Crtc_Gamma_Info *g;
++
++        size = ecore_x_randr_crtc_gamma_size_get(crtcs[i]);
++        if (size < 2) continue;
++        g = malloc(sizeof(*g) + (3 * size * sizeof(unsigned short)));
++        if (!g) continue;
++        g->size = size;
++        g->red = (unsigned short *)(g + 1);
++        g->green = g->red + size;
++        g->blue = g->green + size;
++        for (j = 0; j < size; j++)
++          {
++             double v = (65535.0 * j) / (size - 1);
++
++             g->red[j] = v;
++             g->green[j] = on ? v * 0.80 : v;
++             g->blue[j] = on ? v * 0.58 : v;
++          }
++        ecore_x_randr_crtc_gamma_set(crtcs[i], g);
++        free(g);
++     }
++   free(crtcs);
++   ecore_x_flush();
++#else
++   (void)on;
++#endif
++}
++
++static void
++_night_set(Eina_Bool on)
++{
++   char path[PATH_MAX];
++   FILE *f;
++
++   st.night = on;
++   _night_apply(on);
++   e_user_dir_concat_static(path, "voidbr.night");
++   if (on)
++     {
++        if ((f = fopen(path, "w"))) fclose(f);
++     }
++   else
++     ecore_file_unlink(path);
++}
++
++/* modo avião: ligado quando nenhum rádio que existe está ligado */
++static int
++_airplane_get(void)
++{
++   if ((st.wifi < 0) && (st.bt < 0)) return -1;
++   if ((st.wifi >= 0) && (st.wifi_radio != 0)) return 0;
++   if (st.bt > 0) return 0;
++   return 1;
++}
++
 +static void
 +_popup_update(Status *s)
 +{
 +   char buf[256];
 +
-+   /* Wi-Fi */
-+   if (st.wifi < 0)
++   /* Wi-Fi; sem placa sem fio, o cartão é o da rede cabeada */
++   if ((st.wifi < 0) && (st.eth >= 0))
++     {
++        if (st.eth == 1)
++          snprintf(buf, sizeof(buf), "Cabeada · %s", st.eth_ip[0] ? st.eth_ip : st.eth_if);
++        else
++          eina_strlcpy(buf, "Desconectada", sizeof(buf));
++        _card_set(s->o_card[CARD_WIFI], st.eth == 1, "Rede", buf);
++     }
++   else if (st.wifi < 0)
 +     _card_set(s->o_card[CARD_WIFI], EINA_FALSE, "Wi-Fi", "Sem placa");
 +   else if (st.wifi_radio == 0)
 +     _card_set(s->o_card[CARD_WIFI], EINA_FALSE, "Wi-Fi", "Desligado");
@@ -596,6 +742,26 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +             _module_on("tiling") ? "Ligado" : "Desligado");
 +   _card_set(s->o_card[CARD_DND], !_module_on("notification"), "Não perturbe",
 +             _module_on("notification") ? "Desligado" : "Ligado");
++   if (st.mic < 0)
++     _card_set(s->o_card[CARD_MIC], EINA_FALSE, "Microfone", "Sem microfone");
++   else
++     _card_set(s->o_card[CARD_MIC], st.mic, "Microfone", st.mic ? "Ligado" : "Mudo");
++   _card_set(s->o_card[CARD_CAFFEINE], !e_config->screensaver_enable, "Cafeína",
++             e_config->screensaver_enable ? "Desligado" : "Tela sempre ligada");
++   _card_set(s->o_card[CARD_NIGHT], st.night, "Luz noturna",
++             st.night ? "Ligado" : "Desligado");
++   switch (_airplane_get())
++     {
++      case -1:
++        _card_set(s->o_card[CARD_AIRPLANE], EINA_FALSE, "Modo avião", "Sem rádios");
++        break;
++      case 1:
++        _card_set(s->o_card[CARD_AIRPLANE], EINA_TRUE, "Modo avião", "Ligado");
++        break;
++      default:
++        _card_set(s->o_card[CARD_AIRPLANE], EINA_FALSE, "Modo avião", "Desligado");
++        break;
++     }
 +   _card_set(s->o_card[CARD_SHOT], EINA_FALSE, "Captura", "Tela ou área");
 +   _card_set(s->o_card[CARD_TWEAKS], EINA_FALSE, "Ajustes", "VoidBR");
 +
@@ -650,7 +816,14 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   switch (id)
 +     {
 +      case CARD_WIFI:
-+        if (st.wifi < 0) return;
++        if (st.wifi < 0)
++          {
++             /* rede cabeada: abre o editor de conexões do NetworkManager */
++             if (st.eth < 0) return;
++             _popup_del(s);
++             _run("nm-connection-editor");
++             return;
++          }
 +        _run(st.wifi_radio == 0 ? "nmcli radio wifi on" : "nmcli radio wifi off");
 +        st.wifi_radio = !st.wifi_radio;
 +        break;
@@ -664,6 +837,39 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +        break;
 +      case CARD_DND:
 +        _module_toggle("notification");
++        break;
++      case CARD_MIC:
++        if (st.mic < 0) return;
++        _run("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle 2>/dev/null || "
++             "pactl set-source-mute @DEFAULT_SOURCE@ toggle");
++        st.mic = !st.mic;
++        break;
++      case CARD_CAFFEINE:
++        /* sem protetor de tela nem DPMS (é a opção "Ativar o protetor de tela") */
++        e_config->screensaver_enable = !e_config->screensaver_enable;
++        e_config_save_queue();
++        e_screensaver_update();
++        e_dpms_update();
++        break;
++      case CARD_NIGHT:
++        _night_set(!st.night);
++        break;
++      case CARD_AIRPLANE:
++        switch (_airplane_get())
++          {
++           case 0:
++             _run("nmcli radio all off; bluetoothctl power off");
++             if (st.wifi >= 0) st.wifi_radio = 0;
++             if (st.bt > 0) st.bt = 0;
++             break;
++           case 1:
++             _run("nmcli radio all on; bluetoothctl power on");
++             if (st.wifi >= 0) st.wifi_radio = 1;
++             if (st.bt == 0) st.bt = 1;
++             break;
++           default:
++             return;
++          }
 +        break;
 +      case CARD_SHOT:
 +        _popup_del(s);
@@ -824,7 +1030,8 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +static void
 +_popup_new(Status *s)
 +{
-+   static const char *cards[CARD_LAST] = { "wifi", "bluetooth", "tiling", "dnd", "shot", "tweaks" };
++   static const char *cards[CARD_LAST] = { "wifi", "bluetooth", "tiling", "dnd", "mic",
++                                           "caffeine", "night", "airplane", "shot", "tweaks" };
 +   Evas_Object *box, *tb, *o;
 +   const struct passwd *pw;
 +   char buf[256], ini[8];
@@ -876,7 +1083,9 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   elm_table_homogeneous_set(tb, EINA_TRUE);
 +   for (i = 0; i < CARD_LAST; i++)
 +     {
-+        snprintf(buf, sizeof(buf), THEME_GROUP("card/%s"), cards[i]);
++        /* sem placa sem fio, o primeiro cartão é o da rede cabeada */
++        snprintf(buf, sizeof(buf), THEME_GROUP("card/%s"),
++                 ((i == CARD_WIFI) && (st.wifi < 0) && (st.eth >= 0)) ? "network" : cards[i]);
 +        o = _track(&s->o_card[i], _edje(e_comp->evas, buf));
 +        if (!o) continue;
 +        evas_object_data_set(o, "voidbr_card", (void *)(intptr_t)i);
@@ -1211,6 +1420,7 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +        ecore_x_randr_crtc_info_free(info);
 +     }
 +   free(crtcs);
++   if (st.night) _night_apply(EINA_TRUE);
 +   return EINA_FALSE;
 +}
 +#endif
@@ -1219,7 +1429,7 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +e_modapi_init(E_Module *m)
 +{
 +   st.module = m;
-+   st.wifi = st.wifi_radio = st.bt = st.vol = st.bat = -1;
++   st.wifi = st.wifi_radio = st.bt = st.vol = st.bat = st.eth = st.mic = -1;
 +   _read_sys();
 +   E_LIST_HANDLER_APPEND(st.handlers, ECORE_EXE_EVENT_DATA, _cb_exe_data, NULL);
 +   E_LIST_HANDLER_APPEND(st.handlers, E_EVENT_CLIENT_FOCUS_IN, _cb_client, NULL);
@@ -1230,6 +1440,12 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   e_gadcon_provider_register(&_class_title);
 +   st.poll = ecore_timer_loop_add(3.0, _cb_poll, NULL);
 +   _query_all(EINA_TRUE);
++   {
++      char path[PATH_MAX];
++
++      e_user_dir_concat_static(path, "voidbr.night");
++      if (ecore_file_exists(path)) _night_set(EINA_TRUE);
++   }
 +#ifndef HAVE_WAYLAND_ONLY
 +   /* E_RESTART so existe quando o E foi reiniciado (nao no login) */
 +   if (getenv("E_RESTART"))

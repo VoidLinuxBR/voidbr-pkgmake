@@ -14,7 +14,7 @@
 
 pkgname=enlightenment
 pkgver=0.28.0
-pkgrel=9
+pkgrel=10
 pkgdesc='Enlightenment desktop shell'
 arch=(x86_64 aarch64)
 url=https://www.enlightenment.org
@@ -102,7 +102,12 @@ source=("https://download.enlightenment.org/rel/apps/${pkgname}/${pkgname}-${pkg
 checksum="8ab2d8a76c4009d142561f5136048b969796f4a79df8af6018713d1d163a5c6b"
 
 prepare() {
-	cd "${srcdir}/${pkgname}-${pkgver}"
+	# sempre de um fonte limpo: o pkgmake extrai por cima do anterior, e os
+	# arquivos criados pelos patches (módulo voidbr) ficavam da versão velha
+	cd "${srcdir}"
+	rm -rf "${pkgname}-${pkgver}"
+	tar -xJf "${pkgname}-${pkgver}.tar.xz"
+	cd "${pkgname}-${pkgver}"
 
 	# suspender/hibernar com zzz/ZZZ (o E 0.28 só conhece systemctl, sleep.sh e pm-suspend)
 	patch -Np1 -i ../../patches/01-void-zzz.patch
