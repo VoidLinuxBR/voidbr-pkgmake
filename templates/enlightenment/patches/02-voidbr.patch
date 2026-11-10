@@ -98,8 +98,8 @@ diff -ruN a/src/modules/meson.build b/src/modules/meson.build
    'cpufreq',
 diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 --- a/src/modules/voidbr/e_mod_main.c	1969-12-31 20:00:00.000000000 -0400
-+++ b/src/modules/voidbr/e_mod_main.c	2026-11-10 02:58:47.341745912 -0400
-@@ -0,0 +1,1374 @@
++++ b/src/modules/voidbr/e_mod_main.c	2026-11-10 03:21:09.250936581 -0400
+@@ -0,0 +1,1409 @@
 +/*
 + * Módulo "voidbr" do Enlightenment (VoidBR Linux)
 + *
@@ -129,12 +129,13 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +#define THEME_GROUP(_g) "e/modules/voidbr/" _g
 +
 +/* revisão do módulo (grep -a voidbr-mod-rev no module.so instalado) */
-+__attribute__((used)) static const char _voidbr_rev[] = "voidbr-mod-rev-10";
++__attribute__((used)) static const char _voidbr_rev[] = "voidbr-mod-rev-11";
 +
 +/* -------------------------------------------------------------- estado */
 +
 +typedef enum
 +{
++   CARD_ETH,
 +   CARD_WIFI,
 +   CARD_BT,
 +   CARD_TILING,
@@ -177,6 +178,7 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   char         ssid[128];
 +   int          bt;         /* -1 sem controlador, 0 desligado, 1 ligado */
 +   int          eth;        /* -1 sem placa cabeada, 0 desconectada, 1 conectada */
++   int          eth_nm;     /* estado no NetworkManager: -1 sem nmcli, 0 desconectada, 1 conectada */
 +   char         eth_if[32];
 +   char         eth_ip[64];
 +   int          mic;        /* -1 sem microfone, 0 mudo, 1 ligado */
@@ -351,7 +353,11 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +             if (ecore_file_is_dir(path)) continue;
 +             snprintf(path, sizeof(path), "/sys/class/net/%s/device", de->d_name);
 +             if (!ecore_file_exists(path)) continue;
-+             if (st.eth < 0) st.eth = 0;
++             if (st.eth < 0)
++               {
++                  st.eth = 0;
++                  eina_strlcpy(st.eth_if, de->d_name, sizeof(st.eth_if));
++               }
 +             snprintf(path, sizeof(path), "/sys/class/net/%s/operstate", de->d_name);
 +             if (_file_read(path, buf, sizeof(buf)) && !strcmp(buf, "up"))
 +               {
@@ -362,7 +368,7 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +          }
 +        closedir(d);
 +     }
-+   if (st.eth_if[0])
++   if (st.eth == 1)
 +     {
 +        struct ifaddrs *ifa, *i;
 +
@@ -413,6 +419,7 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   if (slow)
 +     {
 +        _query("radio", "nmcli radio wifi 2>/dev/null");
++        _query("dev", "nmcli -t -f DEVICE,TYPE,STATE device 2>/dev/null");
 +        _query("ssid", "nmcli -t -f active,ssid dev wifi 2>/dev/null");
 +        _query("bt", "bluetoothctl show 2>/dev/null");
 +     }
@@ -477,6 +484,18 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +
 +             if (strstr(l, "Volume:")) st.mic = strstr(l, "MUTED") ? 0 : 1;
 +             else if (!strncmp(l, "Mute:", 5)) st.mic = strstr(l, "yes") ? 0 : 1;
++          }
++     }
++   else if (!strcmp(tag, "dev"))
++     {
++        /* "eth0:ethernet:connected" (ou disconnected, unavailable sem cabo) */
++        for (i = 0; ev->lines[i].line; i++)
++          {
++             const char *l = ev->lines[i].line;
++             size_t n = strlen(st.eth_if);
++
++             if ((!n) || (strncmp(l, st.eth_if, n)) || (l[n] != ':')) continue;
++             st.eth_nm = !!strstr(l + n, ":connected");
 +          }
 +     }
 +   else if (!strcmp(tag, "radio"))
@@ -715,16 +734,19 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +{
 +   char buf[256];
 +
-+   /* Wi-Fi; sem placa sem fio, o cartão é o da rede cabeada */
-+   if ((st.wifi < 0) && (st.eth >= 0))
-+     {
-+        if (st.eth == 1)
-+          snprintf(buf, sizeof(buf), "Cabeada · %s", st.eth_ip[0] ? st.eth_ip : st.eth_if);
-+        else
-+          eina_strlcpy(buf, "Desconectada", sizeof(buf));
-+        _card_set(s->o_card[CARD_WIFI], st.eth == 1, "Rede", buf);
-+     }
-+   else if (st.wifi < 0)
++   /* rede cabeada (como o "Cabeada" do GNOME): conectada pelo NetworkManager;
++    * sem nmcli, vale o estado do link */
++   {
++      Eina_Bool on = (st.eth_nm >= 0) ? (st.eth_nm == 1) : (st.eth == 1);
++
++      if (!on) eina_strlcpy(buf, "Desconectada", sizeof(buf));
++      else if (st.eth_ip[0]) eina_strlcpy(buf, st.eth_ip, sizeof(buf));
++      else eina_strlcpy(buf, "Conectada", sizeof(buf));
++      _card_set(s->o_card[CARD_ETH], on, "Cabeada", buf);
++   }
++
++   /* Wi-Fi */
++   if (st.wifi < 0)
 +     _card_set(s->o_card[CARD_WIFI], EINA_FALSE, "Wi-Fi", "Sem placa");
 +   else if (st.wifi_radio == 0)
 +     _card_set(s->o_card[CARD_WIFI], EINA_FALSE, "Wi-Fi", "Desligado");
@@ -815,15 +837,22 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +
 +   switch (id)
 +     {
++      case CARD_ETH:
++        {
++           /* conecta/desconecta só a cabeada (o Wi-Fi tem o cartão dele) */
++           char cmd[128];
++           Eina_Bool on = (st.eth_nm >= 0) ? (st.eth_nm == 1) : (st.eth == 1);
++
++           if ((st.eth < 0) || (!st.eth_if[0])) return;
++           snprintf(cmd, sizeof(cmd), "nmcli device %s %s",
++                    on ? "disconnect" : "connect", st.eth_if);
++           _run(cmd);
++           st.eth_nm = !on;
++           if (on) st.eth_ip[0] = 0;
++        }
++        break;
 +      case CARD_WIFI:
-+        if (st.wifi < 0)
-+          {
-+             /* rede cabeada: abre o editor de conexões do NetworkManager */
-+             if (st.eth < 0) return;
-+             _popup_del(s);
-+             _run("nm-connection-editor");
-+             return;
-+          }
++        if (st.wifi < 0) return;
 +        _run(st.wifi_radio == 0 ? "nmcli radio wifi on" : "nmcli radio wifi off");
 +        st.wifi_radio = !st.wifi_radio;
 +        break;
@@ -1030,8 +1059,9 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +static void
 +_popup_new(Status *s)
 +{
-+   static const char *cards[CARD_LAST] = { "wifi", "bluetooth", "tiling", "dnd", "mic",
++   static const char *cards[CARD_LAST] = { "network", "wifi", "bluetooth", "tiling", "dnd", "mic",
 +                                           "caffeine", "night", "airplane", "shot", "tweaks" };
++   int pos = 0;
 +   Evas_Object *box, *tb, *o;
 +   const struct passwd *pw;
 +   char buf[256], ini[8];
@@ -1083,9 +1113,13 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   elm_table_homogeneous_set(tb, EINA_TRUE);
 +   for (i = 0; i < CARD_LAST; i++)
 +     {
-+        /* sem placa sem fio, o primeiro cartão é o da rede cabeada */
-+        snprintf(buf, sizeof(buf), THEME_GROUP("card/%s"),
-+                 ((i == CARD_WIFI) && (st.wifi < 0) && (st.eth >= 0)) ? "network" : cards[i]);
++        /* como no GNOME: só aparece o cartão do que a máquina tem */
++        if ((i == CARD_ETH) && (st.eth < 0)) continue;
++        if ((i == CARD_WIFI) && (st.wifi < 0)) continue;
++        if ((i == CARD_BT) && (st.bt < 0)) continue;
++        if ((i == CARD_MIC) && (st.mic < 0)) continue;
++        if ((i == CARD_AIRPLANE) && (_airplane_get() < 0)) continue;
++        snprintf(buf, sizeof(buf), THEME_GROUP("card/%s"), cards[i]);
 +        o = _track(&s->o_card[i], _edje(e_comp->evas, buf));
 +        if (!o) continue;
 +        evas_object_data_set(o, "voidbr_card", (void *)(intptr_t)i);
@@ -1094,7 +1128,8 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +        evas_object_size_hint_weight_set(o, EVAS_HINT_EXPAND, 0);
 +        evas_object_size_hint_align_set(o, EVAS_HINT_FILL, EVAS_HINT_FILL);
 +        evas_object_show(o);
-+        elm_table_pack(tb, o, i % 2, i / 2, 1, 1);
++        elm_table_pack(tb, o, pos % 2, pos / 2, 1, 1);
++        pos++;
 +     }
 +   evas_object_size_hint_align_set(tb, EVAS_HINT_FILL, 0.5);
 +   evas_object_show(tb);
@@ -1429,7 +1464,7 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +e_modapi_init(E_Module *m)
 +{
 +   st.module = m;
-+   st.wifi = st.wifi_radio = st.bt = st.vol = st.bat = st.eth = st.mic = -1;
++   st.wifi = st.wifi_radio = st.bt = st.vol = st.bat = st.eth = st.eth_nm = st.mic = -1;
 +   _read_sys();
 +   E_LIST_HANDLER_APPEND(st.handlers, ECORE_EXE_EVENT_DATA, _cb_exe_data, NULL);
 +   E_LIST_HANDLER_APPEND(st.handlers, E_EVENT_CLIENT_FOCUS_IN, _cb_client, NULL);
