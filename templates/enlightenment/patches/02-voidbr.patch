@@ -98,8 +98,8 @@ diff -ruN a/src/modules/meson.build b/src/modules/meson.build
    'cpufreq',
 diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 --- a/src/modules/voidbr/e_mod_main.c	1969-12-31 20:00:00.000000000 -0400
-+++ b/src/modules/voidbr/e_mod_main.c	2026-11-10 02:42:54.401538137 -0400
-@@ -0,0 +1,1146 @@
++++ b/src/modules/voidbr/e_mod_main.c	2026-11-10 02:52:07.242339340 -0400
+@@ -0,0 +1,1158 @@
 +/*
 + * Módulo "voidbr" do Enlightenment (VoidBR Linux)
 + *
@@ -126,7 +126,7 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +#define THEME_GROUP(_g) "e/modules/voidbr/" _g
 +
 +/* revisão do módulo (grep -a voidbr-mod-rev no module.so instalado) */
-+__attribute__((used)) static const char _voidbr_rev[] = "voidbr-mod-rev-8";
++__attribute__((used)) static const char _voidbr_rev[] = "voidbr-mod-rev-9";
 +
 +/* -------------------------------------------------------------- estado */
 +
@@ -951,6 +951,18 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +
 +   if (ev->button == 1)
 +     {
++        Evas_Coord ox, oy, px, py, pw, ph;
++
++        /* clique no alto-falante: abre o mixer (pavucontrol; sem ele, o do E) */
++        evas_object_geometry_get(s->o, &ox, &oy, NULL, NULL);
++        if ((edje_object_part_geometry_get(s->o, "s_vol", &px, &py, &pw, &ph)) &&
++            (ev->canvas.x >= ox + px - 5) && (ev->canvas.x < ox + px + pw + 5))
++          {
++             if (s->popup) _popup_del(s);
++             _run("for m in pavucontrol pwvucontrol emixer; do "
++                  "command -v $m >/dev/null && exec $m; done");
++             return;
++          }
 +        if (s->popup) _popup_del(s);
 +        else _popup_new(s);
 +     }
