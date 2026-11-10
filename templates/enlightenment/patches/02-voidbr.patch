@@ -98,8 +98,8 @@ diff -ruN a/src/modules/meson.build b/src/modules/meson.build
    'cpufreq',
 diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 --- a/src/modules/voidbr/e_mod_main.c	1969-12-31 20:00:00.000000000 -0400
-+++ b/src/modules/voidbr/e_mod_main.c	2026-11-09 15:00:10.912549855 -0400
-@@ -0,0 +1,1082 @@
++++ b/src/modules/voidbr/e_mod_main.c	2026-11-10 02:29:03.899761911 -0400
+@@ -0,0 +1,1144 @@
 +/*
 + * Módulo "voidbr" do Enlightenment (VoidBR Linux)
 + *
@@ -126,7 +126,7 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +#define THEME_GROUP(_g) "e/modules/voidbr/" _g
 +
 +/* revisão do módulo (grep -a voidbr-mod-rev no module.so instalado) */
-+__attribute__((used)) static const char _voidbr_rev[] = "voidbr-mod-rev-6";
++__attribute__((used)) static const char _voidbr_rev[] = "voidbr-mod-rev-7";
 +
 +/* -------------------------------------------------------------- estado */
 +
@@ -1147,6 +1147,60 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +
 +E_API E_Module_Api e_modapi = { E_MODULE_API_VERSION, "VoidBR" };
 +
++/* --- VM: refaz a saida de video depois de reiniciar ---------------------
++ * Em VM (QEMU/virtio, VirtualBox, VMware) a imagem do Xorg pode parar de
++ * chegar a tela depois que o E reinicia (troca de perfil): o Xorg tem a
++ * imagem, mas a saida "Virtual-N" nao atualiza mais. Desligar e religar a
++ * saida (o mesmo que xrandr --off / --auto) refaz a ligacao. So em saidas
++ * virtuais (ou com VOIDBR_SCREEN_REFRESH=1) e so depois de um reinicio.
++ */
++#ifndef HAVE_WAYLAND_ONLY
++static Ecore_Timer *_vm_timer = NULL;
++
++static Eina_Bool
++_cb_vm_screen_refresh(void *data EINA_UNUSED)
++{
++   Ecore_X_Randr_Crtc *crtcs;
++   Ecore_X_Window root;
++   Eina_Bool force = !!getenv("VOIDBR_SCREEN_REFRESH");
++   int i, n = 0;
++
++   _vm_timer = NULL;
++   if ((!e_comp) || (e_comp->comp_type != E_PIXMAP_TYPE_X)) return EINA_FALSE;
++   root = e_comp->root;
++   crtcs = ecore_x_randr_crtcs_get(root, &n);
++   if (!crtcs) return EINA_FALSE;
++   for (i = 0; i < n; i++)
++     {
++        Ecore_X_Randr_Crtc_Info *info;
++        Eina_Bool virt;
++        char *name;
++
++        info = ecore_x_randr_crtc_info_get(root, crtcs[i]);
++        if (!info) continue;
++        if ((info->mode) && (info->noutput > 0))
++          {
++             name = ecore_x_randr_output_name_get(root, info->outputs[0], NULL);
++             virt = force || ((name) && (!strncmp(name, "Virtual", 7)));
++             free(name);
++             if (virt)
++               {
++                  ecore_x_randr_crtc_settings_set(root, crtcs[i], NULL, 0, 0, 0, 0,
++                                                  ECORE_X_RANDR_ORIENTATION_ROT_0);
++                  ecore_x_sync();
++                  ecore_x_randr_crtc_settings_set(root, crtcs[i], info->outputs,
++                                                  info->noutput, info->x, info->y,
++                                                  info->mode, info->rotation);
++                  ecore_x_sync();
++               }
++          }
++        ecore_x_randr_crtc_info_free(info);
++     }
++   free(crtcs);
++   return EINA_FALSE;
++}
++#endif
++
 +E_API void *
 +e_modapi_init(E_Module *m)
 +{
@@ -1162,6 +1216,11 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   e_gadcon_provider_register(&_class_title);
 +   st.poll = ecore_timer_loop_add(3.0, _cb_poll, NULL);
 +   _query_all(EINA_TRUE);
++#ifndef HAVE_WAYLAND_ONLY
++   /* E_RESTART so existe quando o E foi reiniciado (nao no login) */
++   if (getenv("E_RESTART"))
++     _vm_timer = ecore_timer_loop_add(1.0, _cb_vm_screen_refresh, NULL);
++#endif
 +   return m;
 +}
 +
@@ -1173,6 +1232,9 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   E_FREE_LIST(st.handlers, ecore_event_handler_del);
 +   E_FREE_FUNC(st.poll, ecore_timer_del);
 +   E_FREE_FUNC(st.refresh, ecore_timer_del);
++#ifndef HAVE_WAYLAND_ONLY
++   E_FREE_FUNC(_vm_timer, ecore_timer_del);
++#endif
 +   st.module = NULL;
 +   return 1;
 +}
