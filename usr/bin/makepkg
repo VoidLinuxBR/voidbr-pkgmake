@@ -4,7 +4,7 @@
 #
 #  pkgmake — makepkg-like tool for Void XBPS
 #  Created: dom 21 dez 2025 11:47:51 -04
-#  Updated: sáb 31 out 2026 01:03:44 -04
+#  Updated: sex 13 nov 2026 09:58:13 -04
 #
 #  Copyright (c) 2019-2026, Vilmar Catafesta <vcatafesta@gmail.com>
 #  Assembled By Vilmar Catafesta for the ChiliLinux project.
@@ -45,11 +45,13 @@ set -o pipefail
 
 #system
 declare APP="${0##*/}"
-declare _VERSION_="1.10.31-20261031"
+declare _VERSION_="1.10.32-20261113"
 declare APPDESC="$APP - Wraper for xbps-create"
 declare distro="$(uname -n)"
 declare DEPENDENCIES=(tput)
-declare FETCH_RE='-[^-]+[0-9]+[^.]*.xbps$'
+# separa o pkgname do resto (-<versão>_<revisão>.<arch>.xbps); funciona com
+# .x86_64.xbps e .noarch.xbps (o padrão antigo não pegava os noarch)
+declare FETCH_RE='-[0-9][^-]*_[0-9]+.*.xbps$'
 declare PKG_EXT='xbps'
 
 WORKDIR="$PWD"
@@ -2987,7 +2989,7 @@ ${bold}Opções:${reset}
       ${green}--sign${reset}                       Assinar o pacote recém-construído após o build
       ${green}--sign-only${reset}                  Assinar pacotes do repositório local (sem build)
       ${green}--reindex${reset}                    Atualizar o índice do repositório local após o build
-      ${green}--reindex-only${reset}               Recriar o índice do repositório local e sair
+      ${green}--reindex-only${reset}               Recriar o índice do repositório local (assina pacotes sem .sig2) e sair
       ${green}--reindex-all${reset}                Assinar todos os pacotes e recriar o índice do repositório local e sair
       ${green}--dedup-repo${reset}                 Remove pacotes duplicados do repositório local, mantém a mais nova
   ${green}-c|--clean${reset}                       Limpar diretórios de trabalho
@@ -3094,7 +3096,12 @@ sign_only() {
 
 	msg "Usando chave: $PRIVKEY"
 	shopt -u nullglob
-	[[ "${#pkgs[@]}" -gt 0 ]] || die "nenhum pacote sem assinar em $PKGDEST"
+	if [[ "${#pkgs[@]}" -eq 0 ]]; then
+		# no --sign-only é erro; no --reindex-only só não há nada a assinar
+		((SIGN_ONLY)) && die "nenhum pacote sem assinar em $PKGDEST"
+		msg "nenhum pacote sem assinar em $PKGDEST"
+		return 0
+	fi
 
 	for pkg in "${pkgs[@]}"; do
 		#		msg "Sign package: $(basename "$pkg")"
@@ -3507,9 +3514,15 @@ if $REINDEX_ALL; then
 fi
 
 if $REINDEX_ONLY; then
-	#	REINDEX_FORCE=1
-	REINDEX_FORCE=2
+	# remove antigos, assina os pacotes sem .sig2 (se SIGNPKG=1) e
+	# atualiza o índice (incremental) e a assinatura do índice
+	resolve_signpkg
 	dedup_repo
+	if ((SIGNPKG)); then
+		REINDEX_FORCE=0 # sign_only: só os que NÃO têm .sig2
+		sign_only
+	fi
+	REINDEX_FORCE=2 # create_repodata: incremental (xbps-rindex -f -a)
 	create_repodata
 	exit 0
 fi

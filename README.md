@@ -140,7 +140,7 @@ Opções:
       --sign                       Assinar o pacote recém-construído após o build
       --sign-only                  Assinar pacotes do repositório local (sem build)
       --reindex                    Atualizar o índice do repositório local após o build
-      --reindex-only               Recriar o índice do repositório local e sair
+      --reindex-only               Recriar o índice do repositório local (assina pacotes sem .sig2) e sair
       --reindex-all                Assinar todos os pacotes e recriar o índice do repositório local e sair
   -c|--clean                       Limpar diretórios de trabalho
   -p|--print-config                Imprimir configuracao do /etc/pkgmake.conf
