@@ -165,6 +165,32 @@ Exemplos:
   pkgmake new nano
 ```
 
+ÍNDICE XLOCATE DO REPOSITÓRIO
+-----------------------------
+O pacote também instala o **voidbr-xlocate-index** em `/usr/local/bin/`.
+Ele gera o índice de arquivos (`xlocate`) de um repositório local de
+pacotes `.xbps`, no mesmo formato do índice oficial do Void, e grava
+**dentro do repositório**, em `<repo>/xlocate/xlocate.git` — assim o
+índice acompanha o repositório em qualquer mirror. É o índice usado pelo
+`vinstall -FR` do [`voidbr-vinstall`](https://github.com/voidlinuxbr/voidbr-vinstall).
+
+```
+voidbr-xlocate-index [-f|--force] [dir-do-repo] [destino-do-indice.git]
+```
+
+- `dir-do-repo`: padrão `/vg/void-mirror/extra`
+- `destino-do-indice.git`: padrão `<dir-do-repo>/xlocate/xlocate.git`
+- só regera quando o `x86_64-repodata` é mais novo que o índice; `-f` força
+
+Para regerar automaticamente no servidor (a cada hora, no minuto 5):
+
+```bash
+sudo install -Dm644 server/voidbr-xlocate-index.cron /etc/cron.d/voidbr-xlocate-index
+sudo voidbr-xlocate-index -f    # primeira geração
+```
+
+---
+
 ARQUIVO DE CONFIGURAÇÃO
 -----------------------
 O pkgmake carrega automaticamente:
