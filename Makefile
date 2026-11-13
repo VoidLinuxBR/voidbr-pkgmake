@@ -1,6 +1,7 @@
 PREFIX ?= /usr
 ETCDIR ?= /etc
 BINDIR   = $(PREFIX)/bin
+LOCALBINDIR ?= /usr/local/bin
 SHAREDIR = $(PREFIX)/share/pkgmake
 DOCDIR   = $(PREFIX)/share/doc/pkgmake
 COMPDIR  = $(PREFIX)/share/bash-completion/completions
@@ -39,6 +40,8 @@ deps:
 files:
 	@install -d $(DESTDIR)$(BINDIR) $(DESTDIR)$(SHAREDIR)/docker $(DESTDIR)$(DOCDIR) $(DESTDIR)$(COMPDIR)
 	install -m 755 usr/bin/pkgmake usr/bin/makepkg usr/bin/pkgmake-docker usr/bin/makepkg-docker $(DESTDIR)$(BINDIR)
+	install -d $(DESTDIR)$(LOCALBINDIR)
+	install -m 755 usr/local/bin/voidbr-xlocate-index $(DESTDIR)$(LOCALBINDIR)
 	install -m 644 usr/share/pkgmake/*.sh usr/share/pkgmake/pkgnames.map $(DESTDIR)$(SHAREDIR)
 	install -m 644 usr/share/pkgmake/docker/Dockerfile usr/share/pkgmake/docker/entrypoint.sh $(DESTDIR)$(SHAREDIR)/docker
 	install -m 644 usr/share/bash-completion/completions/pkgmake $(DESTDIR)$(COMPDIR)/pkgmake
@@ -104,6 +107,7 @@ post-install:
 uninstall:
 	@rm -f $(DESTDIR)$(BINDIR)/pkgmake $(DESTDIR)$(BINDIR)/makepkg
 	rm -f $(DESTDIR)$(BINDIR)/pkgmake-docker $(DESTDIR)$(BINDIR)/makepkg-docker
+	rm -f $(DESTDIR)$(LOCALBINDIR)/voidbr-xlocate-index
 	rm -f $(DESTDIR)$(COMPDIR)/pkgmake
 	rm -rf $(DESTDIR)$(SHAREDIR) $(DESTDIR)$(DOCDIR)
 	rm -f $(DESTDIR)$(ETCDIR)/pkgmake.conf.new
