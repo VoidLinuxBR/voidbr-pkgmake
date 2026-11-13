@@ -2498,7 +2498,7 @@ sh_create_INSTALL() {
       echo 'fi'
       echo 'user_home=$(getent passwd "$user" | cut -d: -f6)'
 			echo
-			echo 'if [ -t 1 ]; then'
+			echo 'if [ -t 1 ] || [ -t 2 ] || [ -n "${FORCE_COLOR:-}" ]; then'
 			echo '  RESET="$(printf "%b" "\033[0m")"'
 			echo '  RST="$(printf "%b" "\033[0m")"'
 			echo '  BLACK="$(printf "%b" "\033[1;30m")"'
@@ -2511,7 +2511,7 @@ sh_create_INSTALL() {
 			echo '  WHITE="$(printf "%b" "\033[1;37m")"'
 			echo 'fi'
 			echo 'log() {'
-			echo '  printf "%s[*]%s %s - %s\n" "$CYAN" "${BLACK}$pkgname" "${RST}" "${CYAN}$*${RESET}" 1>&2'
+			echo '  printf "%s[*]%s%s - %s%s\n" "$CYAN" "${BLACK}$pkgname" "${RST}" "${CYAN}$*" "${RESET}" 1>&2'
 			echo '}'
 			echo 'warn() {'
 			echo '  printf "%s[*]WARNING:%s %s - %s\n" "$YELLOW" "$RESET" "$pkgname" "$*" 1>&2'
