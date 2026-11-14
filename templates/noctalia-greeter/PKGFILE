@@ -3,7 +3,7 @@
 pkgname=noctalia-greeter
 _pkgname=noctalia-greeter
 pkgver=1.6.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Greetd greeter for Noctalia"
 arch=('x86_64')
 url="https://github.com/noctalia-dev/noctalia-greeter"
@@ -54,6 +54,7 @@ pkgver() {
 build() {
 	CXXFLAGS+=" -Wno-unused-result"
 	meson "${_pkgname}" build-release \
+		--prefix=/usr \
 		-Db_ndebug=true
 	meson compile -C build-release
 }
@@ -66,15 +67,15 @@ package() {
 }
 
 post_install() {
-	if [[ ! -x /usr/local/bin/noctalia-greeter-apply-appearance ]]; then
+	if [ ! -x /usr/bin/noctalia-greeter-apply-appearance ]; then
 		return 0
 	fi
 
-	NOCTALIA_GREETER_SESSION_BIN=/usr/local/bin/noctalia-greeter-session \
-		/usr/share/noctalia-greeter/setup_greeter_system.sh || true
+	# prepara /var/lib/noctalia-greeter e o greeter.toml, sem alterar o PAM
+	/usr/bin/noctalia-greeter-apply-appearance --setup-system || true
 
 	echo ""
-	echo "==> greetd should use: command = \"/usr/local/bin/noctalia-greeter-session\""
+	echo "==> greetd should use: command = \"/usr/bin/noctalia-greeter-session\""
 	echo "==> Full config block: sudo noctalia-greeter-print-greetd-config"
 	echo ""
 }
