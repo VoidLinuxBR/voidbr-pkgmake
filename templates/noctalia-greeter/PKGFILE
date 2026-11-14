@@ -25,6 +25,10 @@ depends=(
 	'wayland'
 	'wlroots0.20'
 	freetype
+	'libinput'
+	'libjxl'
+	'libxml2'
+	'tomlplusplus'
 )
 makedepends=(
 	'git'
@@ -34,6 +38,20 @@ makedepends=(
 	'wayland-protocols'
   librsvg-devel
   wlroots0.20-devel
+	'stb'
+	'libwebp-devel'
+	'libjxl-devel'
+	'libxml2-devel'
+	'libinput-devel'
+	'tomlplusplus-devel'
+	'nlohmann-json'
+	'wayland-devel'
+	'libxkbcommon-devel'
+	'libglvnd-devel'
+	'cairo-devel'
+	'pango-devel'
+	'fontconfig-devel'
+	'freetype-devel'
 )
 optdepends=(
 	'noctalia-git: Wallpaper and palette sync from Noctalia'
@@ -53,10 +71,10 @@ pkgver() {
 
 build() {
 	CXXFLAGS+=" -Wno-unused-result"
-	meson "${_pkgname}" build-release \
+	meson setup "${_pkgname}" build-release \
 		--prefix=/usr \
-		-Db_ndebug=true
-	meson compile -C build-release
+		-Db_ndebug=true || return 1
+	meson compile -C build-release || return 1
 }
 
 package() {
