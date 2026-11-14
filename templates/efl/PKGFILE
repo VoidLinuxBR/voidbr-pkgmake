@@ -9,7 +9,7 @@
 
 pkgname=efl
 pkgver=1.29.0
-pkgrel=3
+pkgrel=4
 pkgdesc='Enlightenment Foundation Libraries'
 arch=(x86_64 aarch64)
 url=https://www.enlightenment.org
@@ -17,7 +17,11 @@ license=(LGPL-2.1-only)
 provides=("efl-devel-${pkgver}_${pkgrel}") # headers e .pc do efl-devel vêm aqui
 replaces=(efl-devel)                       # remove o efl-devel do Void
 conflicts=()
-depends=()
+# bibliotecas que o EFL carrega em tempo de execução (o pkgmake não gera
+# essas dependências sozinho a partir dos .so)
+depends=(
+	lua52 # liblua5.2.so.5.2 (scripts Lua do edje); sem ele o enlightenment nem abre
+)
 makedepends=(
 	meson
 	pkgconf
