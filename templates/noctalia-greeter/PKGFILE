@@ -1,7 +1,6 @@
 # Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
 
 pkgname=noctalia-greeter
-_pkgname=noctalia-greeter
 pkgver=1.6.0
 pkgrel=2
 pkgdesc="Greetd greeter for Noctalia"
@@ -36,8 +35,8 @@ makedepends=(
 	'ninja'
 	'pkgconf'
 	'wayland-protocols'
-  librsvg-devel
-  wlroots0.20-devel
+	librsvg-devel
+	wlroots0.20-devel
 	'stb'
 	'libwebp-devel'
 	'libjxl-devel'
@@ -62,7 +61,7 @@ source=("git+${url}.git")
 sha256sums=('SKIP')
 
 pkgver() {
-	cd "${_pkgname}"
+	cd "${pkgname}"
 
 	local version
 	version="$(sed -n "s/^  version: '\([^']*\)',/\1/p" meson.build)"
@@ -71,7 +70,7 @@ pkgver() {
 
 build() {
 	CXXFLAGS+=" -Wno-unused-result"
-	meson setup "${_pkgname}" build-release \
+	meson setup "${pkgname}" build-release \
 		--prefix=/usr \
 		-Db_ndebug=true || return 1
 	meson compile -C build-release || return 1
@@ -80,11 +79,21 @@ build() {
 package() {
 	meson install -C build-release --destdir "${pkgdir}"
 
-	install -Dm644 "${_pkgname}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
-	install -Dm644 "${_pkgname}/README.md" "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+	install -Dm644 "${pkgname}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+	install -Dm644 "${pkgname}/README.md" "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+}
+
+pre_install() {
+	log "Iniciando instalação"
 }
 
 post_install() {
+	if [ "${update:-}" = "yes" ]; then
+		log "Finalizando upgrade"
+	else
+		log "Finalizando instalação"
+	fi
+
 	if [ ! -x /usr/bin/noctalia-greeter-apply-appearance ]; then
 		return 0
 	fi
@@ -92,10 +101,14 @@ post_install() {
 	# prepara /var/lib/noctalia-greeter e o greeter.toml, sem alterar o PAM
 	/usr/bin/noctalia-greeter-apply-appearance --setup-system || true
 
-	echo ""
-	echo "==> greetd should use: command = \"/usr/bin/noctalia-greeter-session\""
-	echo "==> Full config block: sudo noctalia-greeter-print-greetd-config"
-	echo ""
+	echo
+	log '==> greetd should use: command = "/usr/bin/noctalia-greeter-session"'
+	log '==> Full config block: sudo noctalia-greeter-print-greetd-config'
+	echo
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
 }
 
 post_upgrade() {
