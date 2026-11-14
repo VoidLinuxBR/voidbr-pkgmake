@@ -10,14 +10,15 @@ conflicts=(voidbr-google-chrome)  # "nunca me deixe coexistir com o pkg1 pkg2 or
 arch=('x86_64')
 url="https://www.google.com/chrome"
 license=('custom:chrome')
-#depends=(alsa-lib	gtk3 libcups libxss libxtst nss ttf-liberation xdg-utils)
+depends=(alsa-lib at-spi2-atk at-spi2-core atk cairo dbus-libs eudev-libudev expat glib gtk+3
+	libcups libgbm libX11 libXcomposite libXdamage libXext libXfixes libXrandr libxcb libxkbcommon
+	nspr nss pango liberation-fonts-ttf xdg-utils)
 options=('!emptydirs' '!strip')
-install=$pkgname.install
 _channel=stable
 source=("https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-${_channel}/google-chrome-${_channel}_${pkgver}-1_amd64.deb"
 	'eula_text.html'
 	"google-chrome-$_channel.sh")
-sha512sums=('7898b88e9b989b6b934bb864d98ba41be4f9e234e782fbf53822873675e86660292ff69f34135f6cbf319725849985cc75cf2277d3468142ffdc62e35e745c61'
+sha512sums=('b7609f7eda276e569133ba7047dee4bfcbf431fc90ed38fe7c7fbb1c18c8a6a8fd6614915ab6910974b26d9e24c44b2f3142c02927e88861779b429a67a77bea'
 	'a225555c06b7c32f9f2657004558e3f996c981481dbb0d3cd79b1d59fa3f05d591af88399422d3ab29d9446c103e98d567aeafe061d9550817ab6e7eb0498396'
 	'de02b498a4b5b93e21622c8dba57befe795d733a04656be911cc38e28bfef0e20470450f44be523bbde8d4de28f79c10434846ca01fc2a2f4e67707b79332f94')
 makedepends=(bsdtar)
@@ -25,6 +26,9 @@ makedepends=(bsdtar)
 package() {
 	echo $pkgdir
 	bsdtar -xf data.tar.xz -C "$pkgdir/"
+
+	# suid sandbox
+	chmod 4755 "$pkgdir"/opt/google/chrome/chrome-sandbox
 
 	# Launcher
 	install -m755 google-chrome-$_channel.sh "$pkgdir"/usr/bin/google-chrome-$_channel
@@ -42,7 +46,6 @@ package() {
 
 	# Fix the Chrome desktop entry
 	sed -i \
-		-e "/Exec=/i\StartupWMClass=Google-chrome" \
 		-e "s/x-scheme-handler\/ftp;\?//g" \
 		"$pkgdir"/usr/share/applications/google-chrome.desktop
 
@@ -51,6 +54,7 @@ package() {
 		"$pkgdir"/etc/cron.daily/ \
 		"$pkgdir"/opt/google/chrome/cron/ \
 		"$pkgdir"/opt/google/chrome/product_logo_*.png
+	rmdir "$pkgdir"/etc
 }
 
 pre_install() {
@@ -59,6 +63,8 @@ pre_install() {
 
 post_install() {
 	log "Finalizando instalação"
+	log "Flags personalizadas devem ir em: ~/.config/chrome-flags.conf"
+	log "O launcher se chama: 'google-chrome-stable'"
 }
 
 pre_upgrade() {
