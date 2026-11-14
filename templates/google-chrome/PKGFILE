@@ -1,7 +1,7 @@
 # Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
 
 pkgname=google-chrome
-pkgver=155.0.8059.79
+pkgver=157.0.8103.78
 pkgrel=1
 pkgdesc="The popular web browser by Google (Stable Channel)"
 provides=(voidbr-google-chrome)   # "eu SOU o $pkgname pkg1, pra quem depender deles"
