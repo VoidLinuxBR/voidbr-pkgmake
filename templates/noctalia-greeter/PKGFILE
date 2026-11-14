@@ -2,7 +2,7 @@
 
 pkgname=noctalia-greeter
 pkgver=1.6.0
-pkgrel=2
+pkgrel=3
 pkgdesc="Greetd greeter for Noctalia"
 arch=('x86_64')
 url="https://github.com/noctalia-dev/noctalia-greeter"
@@ -96,6 +96,13 @@ post_install() {
 
 	if [ ! -x /usr/bin/noctalia-greeter-apply-appearance ]; then
 		return 0
+	fi
+
+	# versoes antigas instalavam em /usr/local/bin; ajusta o comando do greetd
+	if [ -f /etc/greetd/config.toml ] && grep -q '/usr/local/bin/noctalia-greeter' /etc/greetd/config.toml; then
+		cp -a /etc/greetd/config.toml /etc/greetd/config.toml.bak
+		sed -i 's#/usr/local/bin/noctalia-greeter#/usr/bin/noctalia-greeter#g' /etc/greetd/config.toml
+		log 'greetd: comando ajustado para /usr/bin (copia em /etc/greetd/config.toml.bak)'
 	fi
 
 	# prepara /var/lib/noctalia-greeter e o greeter.toml, sem alterar o PAM
