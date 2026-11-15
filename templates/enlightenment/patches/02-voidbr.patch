@@ -98,8 +98,8 @@ diff -ruN a/src/modules/meson.build b/src/modules/meson.build
    'cpufreq',
 diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 --- a/src/modules/voidbr/e_mod_main.c	1969-12-31 20:00:00.000000000 -0400
-+++ b/src/modules/voidbr/e_mod_main.c	2026-11-10 03:21:09.250936581 -0400
-@@ -0,0 +1,1409 @@
++++ b/src/modules/voidbr/e_mod_main.c	2026-11-15 23:09:48.687992631 -0400
+@@ -0,0 +1,1538 @@
 +/*
 + * Módulo "voidbr" do Enlightenment (VoidBR Linux)
 + *
@@ -129,7 +129,7 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +#define THEME_GROUP(_g) "e/modules/voidbr/" _g
 +
 +/* revisão do módulo (grep -a voidbr-mod-rev no module.so instalado) */
-+__attribute__((used)) static const char _voidbr_rev[] = "voidbr-mod-rev-11";
++__attribute__((used)) static const char _voidbr_rev[] = "voidbr-mod-rev-12";
 +
 +/* -------------------------------------------------------------- estado */
 +
@@ -629,6 +629,130 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   if (!m) return;
 +   if (e_module_enabled_get(m)) e_module_disable(m);
 +   else e_module_enable(m);
++   /* grava já, não quando o E ficar ocioso: o voidbr-enlightenment-tweaks
++    * lê o e.cfg para mostrar o estado. O e_config_save() não serve: grava
++    * o e.cfg duas vezes seguidas e as duas threads somem com o arquivo. */
++   e_config_save_queue();
++   e_config_save_flush();
++}
++
++/* Mosaico: o módulo tiling só encaixa janelas nas áreas de trabalho
++ * marcadas no module.tiling.cfg; ligado sozinho, não faz nada. Ao ligar
++ * pelo cartão faz o mesmo que o voidbr-enlightenment-tweaks: marca todas
++ * as áreas (até 4 monitores) e cria os atalhos que ainda não existem. */
++#define TILING_ESPACO 6 /* px entre as janelas */
++
++typedef struct
++{
++   int x, y, zone_num, nb_stacks;
++} Tiling_VDesk;
++
++typedef struct
++{
++   int tile_dialogs, show_titles, have_floating_mode, window_padding;
++   Eina_List *vdesks;
++} Tiling_Cfg;
++
++static const struct
++{
++   unsigned int mod;
++   const char *key, *action;
++} _tiling_keys[] = {
++   { E_BINDING_MODIFIER_WIN | E_BINDING_MODIFIER_SHIFT, "Left", "move_left" },
++   { E_BINDING_MODIFIER_WIN | E_BINDING_MODIFIER_SHIFT, "Right", "move_right" },
++   { E_BINDING_MODIFIER_WIN | E_BINDING_MODIFIER_SHIFT, "Up", "move_up" },
++   { E_BINDING_MODIFIER_WIN | E_BINDING_MODIFIER_SHIFT, "Down", "move_down" },
++   { E_BINDING_MODIFIER_WIN, "f", "toggle_floating" },
++   { E_BINDING_MODIFIER_WIN, "s", "toggle_split_mode" },
++};
++
++/* grava o module.tiling.cfg com o módulo ainda desligado: ao ligar, o
++ * tiling lê o arquivo (os nomes seguem os do e_mod_tiling.c). Grava
++ * direto com eet: o e_config_domain_save termina numa thread, depois que
++ * o módulo já leu a config antiga. */
++static void
++_tiling_cfg_write(void)
++{
++   E_Config_DD *edd, *vedd;
++   Tiling_Cfg cfg = { 0, 1, 1, TILING_ESPACO, NULL };
++   Tiling_VDesk *vd;
++   Eet_File *ef;
++   char path[PATH_MAX];
++   int z, x, y;
++
++   vedd = E_CONFIG_DD_NEW("Tiling_Config_VDesk", Tiling_VDesk);
++   E_CONFIG_VAL(vedd, Tiling_VDesk, x, INT);
++   E_CONFIG_VAL(vedd, Tiling_VDesk, y, INT);
++   E_CONFIG_VAL(vedd, Tiling_VDesk, zone_num, INT);
++   E_CONFIG_VAL(vedd, Tiling_VDesk, nb_stacks, INT);
++   edd = E_CONFIG_DD_NEW("Tiling_Config", Tiling_Cfg);
++   E_CONFIG_VAL(edd, Tiling_Cfg, tile_dialogs, INT);
++   E_CONFIG_VAL(edd, Tiling_Cfg, show_titles, INT);
++   E_CONFIG_VAL(edd, Tiling_Cfg, have_floating_mode, INT);
++   E_CONFIG_VAL(edd, Tiling_Cfg, window_padding, INT);
++   E_CONFIG_LIST(edd, Tiling_Cfg, vdesks, vedd);
++
++   for (z = 0; z < 4; z++)
++     for (x = 0; x < e_config->zone_desks_x_count; x++)
++       for (y = 0; y < e_config->zone_desks_y_count; y++)
++         {
++            vd = E_NEW(Tiling_VDesk, 1);
++            vd->x = x;
++            vd->y = y;
++            vd->zone_num = z;
++            vd->nb_stacks = 1;
++            cfg.vdesks = eina_list_append(cfg.vdesks, vd);
++         }
++   e_user_dir_snprintf(path, sizeof(path), "config/%s/module.tiling.cfg",
++                       e_config_profile_get());
++   ef = eet_open(path, EET_FILE_MODE_WRITE);
++   if (ef)
++     {
++        eet_data_write(ef, edd, "config", &cfg, EET_COMPRESSION_SUPERFAST);
++        eet_close(ef);
++     }
++
++   E_FREE_LIST(cfg.vdesks, free);
++   E_CONFIG_DD_FREE(edd);
++   E_CONFIG_DD_FREE(vedd);
++}
++
++static void
++_tiling_keys_add(void)
++{
++   E_Config_Binding_Key *bi;
++   Eina_List *l;
++   Eina_Bool novo = EINA_FALSE, tem;
++   unsigned int i;
++
++   for (i = 0; i < EINA_C_ARRAY_LENGTH(_tiling_keys); i++)
++     {
++        tem = EINA_FALSE;
++        EINA_LIST_FOREACH(e_bindings->key_bindings, l, bi)
++          {
++             if ((bi->modifiers == _tiling_keys[i].mod) && (bi->key) &&
++                 (!strcmp(bi->key, _tiling_keys[i].key)))
++               {
++                  tem = EINA_TRUE;
++                  break;
++               }
++          }
++        if (tem) continue;
++        if (!novo) e_comp_canvas_keys_ungrab();
++        novo = EINA_TRUE;
++        bi = E_NEW(E_Config_Binding_Key, 1);
++        bi->context = E_BINDING_CONTEXT_ANY;
++        bi->key = eina_stringshare_add(_tiling_keys[i].key);
++        bi->modifiers = _tiling_keys[i].mod;
++        bi->any_mod = 0;
++        bi->action = eina_stringshare_add(_tiling_keys[i].action);
++        bi->params = NULL;
++        e_bindings->key_bindings = eina_list_append(e_bindings->key_bindings, bi);
++        e_bindings_key_add(bi->context, bi->key, bi->modifiers, bi->any_mod,
++                           bi->action, bi->params);
++     }
++   if (!novo) return;
++   e_comp_canvas_keys_grab();
 +   e_config_save_queue();
 +}
 +
@@ -862,6 +986,11 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +        st.bt = !st.bt;
 +        break;
 +      case CARD_TILING:
++        if (!_module_on("tiling"))
++          {
++             _tiling_cfg_write();
++             _tiling_keys_add();
++          }
 +        _module_toggle("tiling");
 +        break;
 +      case CARD_DND:
