@@ -168,8 +168,8 @@ diff -ruN a/src/modules/tiling/e_mod_tiling.c b/src/modules/tiling/e_mod_tiling.
  static Eina_Bool
 diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 --- a/src/modules/voidbr/e_mod_main.c	1969-12-31 20:00:00.000000000 -0400
-+++ b/src/modules/voidbr/e_mod_main.c	2026-11-15 23:09:48.687992631 -0400
-@@ -0,0 +1,1538 @@
++++ b/src/modules/voidbr/e_mod_main.c	2026-11-16 17:19:45.688279964 -0400
+@@ -0,0 +1,1564 @@
 +/*
 + * Módulo "voidbr" do Enlightenment (VoidBR Linux)
 + *
@@ -199,7 +199,7 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +#define THEME_GROUP(_g) "e/modules/voidbr/" _g
 +
 +/* revisão do módulo (grep -a voidbr-mod-rev no module.so instalado) */
-+__attribute__((used)) static const char _voidbr_rev[] = "voidbr-mod-rev-12";
++__attribute__((used)) static const char _voidbr_rev[] = "voidbr-mod-rev-13";
 +
 +/* -------------------------------------------------------------- estado */
 +
@@ -478,6 +478,29 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +     }
 +}
 +
++/* há adaptador Bluetooth? Sem ele o "bluetoothctl show" não termina: fica
++ * esperando um controlador aparecer, e cada consulta deixava um processo
++ * parado (um a cada 12 s, para sempre) */
++static Eina_Bool
++_bt_hw(void)
++{
++   DIR *d;
++   struct dirent *de;
++   Eina_Bool tem = EINA_FALSE;
++
++   if (!(d = opendir("/sys/class/bluetooth"))) return EINA_FALSE;
++   while ((de = readdir(d)))
++     {
++        if (!strncmp(de->d_name, "hci", 3))
++          {
++             tem = EINA_TRUE;
++             break;
++          }
++     }
++   closedir(d);
++   return tem;
++}
++
 +static void
 +_query_all(Eina_Bool slow)
 +{
@@ -491,7 +514,10 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +        _query("radio", "nmcli radio wifi 2>/dev/null");
 +        _query("dev", "nmcli -t -f DEVICE,TYPE,STATE device 2>/dev/null");
 +        _query("ssid", "nmcli -t -f active,ssid dev wifi 2>/dev/null");
-+        _query("bt", "bluetoothctl show 2>/dev/null");
++        /* com adaptador, mas sem o serviço bluetoothd, também trava: o
++         * timeout garante que o processo termina */
++        if (_bt_hw()) _query("bt", "timeout 3 bluetoothctl show 2>/dev/null");
++        else st.bt = -1;
 +     }
 +}
 +
@@ -1052,7 +1078,7 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +        break;
 +      case CARD_BT:
 +        if (st.bt < 0) return;
-+        _run(st.bt ? "bluetoothctl power off" : "bluetoothctl power on");
++        _run(st.bt ? "timeout 3 bluetoothctl power off" : "timeout 3 bluetoothctl power on");
 +        st.bt = !st.bt;
 +        break;
 +      case CARD_TILING:
@@ -1086,12 +1112,12 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +        switch (_airplane_get())
 +          {
 +           case 0:
-+             _run("nmcli radio all off; bluetoothctl power off");
++             _run("nmcli radio all off; timeout 3 bluetoothctl power off");
 +             if (st.wifi >= 0) st.wifi_radio = 0;
 +             if (st.bt > 0) st.bt = 0;
 +             break;
 +           case 1:
-+             _run("nmcli radio all on; bluetoothctl power on");
++             _run("nmcli radio all on; timeout 3 bluetoothctl power on");
 +             if (st.wifi >= 0) st.wifi_radio = 1;
 +             if (st.bt == 0) st.bt = 1;
 +             break;
