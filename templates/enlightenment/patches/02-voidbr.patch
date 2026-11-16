@@ -96,6 +96,76 @@ diff -ruN a/src/modules/meson.build b/src/modules/meson.build
  # modules have a custom binary as well
    'battery',
    'cpufreq',
+diff -ruN a/src/modules/tiling/e_mod_tiling.c b/src/modules/tiling/e_mod_tiling.c
+--- a/src/modules/tiling/e_mod_tiling.c	2026-10-31 07:27:41.000000000 -0400
++++ b/src/modules/tiling/e_mod_tiling.c	2026-11-15 23:28:11.355652982 -0400
+@@ -709,25 +709,56 @@
+      }
+ }
+ 
++/* VoidBR: divisão "dwindle", como no Hyprland. A janela nova divide ao
++ * meio a janela com foco (ou a que está sob o mouse, ou a última), e cada
++ * divisão alterna a direção: lado a lado, depois em cima/embaixo, depois
++ * lado a lado... Sem isto o E põe todas lado a lado em colunas cada vez
++ * mais finas, a menos que se troque a divisão com Super+S a cada janela. */
+ static void
+-_insert_client(E_Client *ec, Tiling_Split_Type type)
++_insert_client(E_Client *ec, Tiling_Split_Type type EINA_UNUSED)
+ {
+    E_Client *ec_focused = e_client_focused_get();
+-   Window_Tree *place = NULL;
++   Window_Tree *buddy = NULL, *n;
++   Tiling_Split_Type parent_type;
++   int x, y, nivel = 0;
+ 
+-   if (ec_focused == ec)
++   if (!_G.tinfo->tree)
+      {
+-        _insert_client_preferred(ec);
++        _G.tinfo->tree = tiling_window_tree_insert(NULL, NULL, ec,
++                                                   TILING_SPLIT_HORIZONTAL, EINA_FALSE);
++        return;
+      }
+-   else
+-     {
+-        //otherwise place next to the given client
+-        place = tiling_window_tree_client_find(_G.tinfo->tree,
+-                                               ec_focused);
+-        _G.tinfo->tree = tiling_window_tree_insert(_G.tinfo->tree, place, ec, type, EINA_FALSE);
+ 
++   if ((ec_focused) && (ec_focused != ec))
++     buddy = tiling_window_tree_client_find(_G.tinfo->tree, ec_focused);
++   if (!buddy)
++     {
++        evas_pointer_canvas_xy_get(e_comp->evas, &x, &y);
++        buddy = _tilable_client(x, y);
++     }
++   if (!buddy)
++     {
++        buddy = _G.tinfo->tree;
++        while ((buddy) && (!buddy->client) && (buddy->children))
++          buddy = EINA_INLIST_CONTAINER_GET(eina_inlist_last(buddy->children), Window_Tree);
+      }
++   if ((!buddy) || (!buddy->client))
++     {
++        _G.tinfo->tree = tiling_window_tree_insert(_G.tinfo->tree, NULL, ec,
++                                                   TILING_SPLIT_HORIZONTAL, EINA_FALSE);
++        return;
++     }
++
++   /* a divisão de um nó é (nível % 2): raiz lado a lado, filhos em pé... */
++   for (n = buddy->parent; n && n->parent; n = n->parent) nivel++;
++   parent_type = nivel % 2;
+ 
++   /* sozinha no grupo: entra ao lado dela no mesmo grupo; senão divide a
++    * própria janela na outra direção */
++   _G.tinfo->tree = tiling_window_tree_insert(
++      _G.tinfo->tree, buddy, ec,
++      (eina_inlist_count(buddy->parent->children) <= 1) ? parent_type : !parent_type,
++      EINA_FALSE);
+ }
+ 
+ static Eina_Bool
 diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 --- a/src/modules/voidbr/e_mod_main.c	1969-12-31 20:00:00.000000000 -0400
 +++ b/src/modules/voidbr/e_mod_main.c	2026-11-15 23:09:48.687992631 -0400

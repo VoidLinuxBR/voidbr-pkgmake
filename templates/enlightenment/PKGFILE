@@ -7,14 +7,14 @@
 # histórico da área de transferência, e os eventos de ACPI (tampa, botões)
 # lidos direto do /dev/input, sem acpid.
 #
-# Patch do VoidBR: 02 adiciona o módulo "voidbr"
+# Patch do VoidBR: 02 adiciona o módulo "voidbr", o mosaico em espiral (dwindle)
 # (central de controle) e o nome/botões de energia na tela de bloqueio.
 #
 # Como no efl, os headers/.pc (enlightenment-devel no Void) vão neste pacote.
 
 pkgname=enlightenment
 pkgver=0.28.0
-pkgrel=12
+pkgrel=13
 pkgdesc='Enlightenment desktop shell'
 arch=(x86_64 aarch64)
 url=https://www.enlightenment.org
