@@ -2,7 +2,7 @@
 
 pkgname=aquamarine
 pkgver=0.12.1
-pkgrel=1
+pkgrel=2
 pkgdesc='a very light linux rendering backend library'
 replaces=()
 provides=()
@@ -36,7 +36,7 @@ depends=(
 	libEGL
 	libglvnd
 	glibc
-	libdisplay-info
+	'libdisplay-info>=0.3.0<0.4' # soname .so.3 — rebuild obrigatório ao mudar
 	libdrm
 	libgbm
 	libgcc
@@ -49,6 +49,7 @@ depends=(
 )
 makedepends=(
 	cmake
+	libdisplay-info-devel
 	hyprwayland-scanner
 	hyprutils
 )
@@ -88,5 +89,3 @@ pre_upgrade() {
 post_upgrade() {
   log "Finalizando upgrade"
 }
-
-
