@@ -168,8 +168,8 @@ diff -ruN a/src/modules/tiling/e_mod_tiling.c b/src/modules/tiling/e_mod_tiling.
  static Eina_Bool
 diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 --- a/src/modules/voidbr/e_mod_main.c	1969-12-31 20:00:00.000000000 -0400
-+++ b/src/modules/voidbr/e_mod_main.c	2026-11-16 17:19:45.688279964 -0400
-@@ -0,0 +1,1564 @@
++++ b/src/modules/voidbr/e_mod_main.c	2026-11-18 10:48:01.533972795 -0400
+@@ -0,0 +1,1568 @@
 +/*
 + * Módulo "voidbr" do Enlightenment (VoidBR Linux)
 + *
@@ -199,7 +199,7 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +#define THEME_GROUP(_g) "e/modules/voidbr/" _g
 +
 +/* revisão do módulo (grep -a voidbr-mod-rev no module.so instalado) */
-+__attribute__((used)) static const char _voidbr_rev[] = "voidbr-mod-rev-13";
++__attribute__((used)) static const char _voidbr_rev[] = "voidbr-mod-rev-14";
 +
 +/* -------------------------------------------------------------- estado */
 +
@@ -375,13 +375,17 @@ diff -ruN a/src/modules/voidbr/e_mod_main.c b/src/modules/voidbr/e_mod_main.c
 +   ecore_exe_run(cmd, NULL);
 +}
 +
-+/* comandos cuja saída interessa: a tag diz como ler */
++/* comandos cuja saída interessa: a tag diz como ler. Rodam com LC_ALL=C: o
++ * pactl traduz a saída ("Mute: sim/não" em pt_BR) e a leitura procura o texto
++ * em inglês ("yes") */
 +static void
 +_query(const char *tag, const char *cmd)
 +{
 +   Ecore_Exe *exe;
++   char buf[1024];
 +
-+   exe = ecore_exe_pipe_run(cmd, ECORE_EXE_PIPE_READ | ECORE_EXE_PIPE_READ_LINE_BUFFERED |
++   snprintf(buf, sizeof(buf), "export LC_ALL=C; %s", cmd);
++   exe = ecore_exe_pipe_run(buf, ECORE_EXE_PIPE_READ | ECORE_EXE_PIPE_READ_LINE_BUFFERED |
 +                            ECORE_EXE_NOT_LEADER | ECORE_EXE_TERM_WITH_PARENT, (void *)EXE_TAG);
 +   if (exe) ecore_exe_tag_set(exe, tag);
 +}
