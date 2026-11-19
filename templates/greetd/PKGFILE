@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+#
+# greetd para o VoidBR. Baseado no template do Void (srcpkgs/greetd), com a
+# mesma config (vt = 7, greeter rodando como _greeter) e o mesmo PAM.
+#
+# Diferença do Void: o serviço runit (/etc/sv/greetd/run) espera o dbus
+# antes de subir. No Void o run é só "exec greetd"; no boot o
+# [initial_session] (autologin) abria a sessão antes do dbus/elogind estarem
+# prontos -> sessão sem seat -> compositor em panic (cosmic-comp saía com
+# 101). O dbus ativa o elogind, então esperar o dbus basta.
+
+pkgname=greetd
+pkgver=0.10.3
+pkgrel=3 # Void está em 0.10.3_2
+pkgdesc='Minimal and flexible login manager daemon'
+arch=(x86_64)
+url=https://git.sr.ht/~kennylevinsen/greetd
+license=(GPL-3.0-or-later)
+depends=(
+	glibc
+	libgcc
+	pam
+)
+makedepends=(
+	cargo
+	pam-devel
+	pkg-config
+	scdoc
+)
+backup=(etc/greetd/config.toml)
+source=("${pkgname}-${pkgver}.tar.gz::https://git.sr.ht/~kennylevinsen/greetd/archive/${pkgver}.tar.gz")
+sha256sums=('ee5cb70e0add4ca9c9fe57e47581ab0002d44c07743fb5492469f3b570db640b')
+
+prepare() {
+	cd "${pkgname}-${pkgver}"
+	# mesmos patches do Void: VT 7 e usuário do greeter _greeter
+	sed -i 's/^vt = 1$/vt = 7/' config.toml
+	sed -i 's/^user = "greeter"$/user = "_greeter"/' config.toml
+	cargo fetch --locked
+}
+
+build() {
+	cd "${pkgname}-${pkgver}"
+	cargo build --release --frozen
+	make -C man
+}
+
+package() {
+	cd "${pkgname}-${pkgver}"
+	install -Dm755 target/release/agreety "${pkgdir}"/usr/bin/agreety
+	install -Dm755 target/release/fakegreet "${pkgdir}"/usr/bin/fakegreet
+	install -Dm755 target/release/greetd "${pkgdir}"/usr/bin/greetd
+	install -Dm644 config.toml "${pkgdir}"/etc/greetd/config.toml
+
+	make -C man install PREFIX=/usr DESTDIR="${pkgdir}"
+
+	# PAM igual ao do Void (srcpkgs/greetd/files/greetd.pam)
+	install -dm755 "${pkgdir}"/etc/pam.d
+	cat >"${pkgdir}"/etc/pam.d/greetd <<-'EOF'
+		#%PAM-1.0
+
+		auth       required     pam_securetty.so
+		auth       requisite    pam_nologin.so
+		auth       include      system-local-login
+		-auth      optional     pam_gnome_keyring.so
+		account    include      system-local-login
+		session    include      system-local-login
+		-session   optional     pam_gnome_keyring.so auto_start
+	EOF
+	chmod 644 "${pkgdir}"/etc/pam.d/greetd
+
+	# VoidBR: runit esperando o dbus (ver cabeçalho). Se o dbus não estiver
+	# habilitado, não bloqueia.
+	install -dm755 "${pkgdir}"/etc/sv/greetd
+	cat >"${pkgdir}"/etc/sv/greetd/run <<-'EOF'
+		#!/bin/sh
+		exec 2>&1
+		if [ -e /var/service/dbus ]; then
+			sv check dbus >/dev/null || exit 1
+		fi
+		exec greetd
+	EOF
+	chmod 755 "${pkgdir}"/etc/sv/greetd/run
+	ln -s /run/runit/supervise.greetd "${pkgdir}"/etc/sv/greetd/supervise
+
+	if [ -f LICENSE ]; then
+		install -Dm644 LICENSE "${pkgdir}"/usr/share/licenses/${pkgname}/LICENSE
+	fi
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+	# VoidBR: equivalente ao system_accounts="_greeter" do template do Void
+	if ! getent passwd _greeter >/dev/null; then
+		useradd -r -U -G video -d /var/lib/_greeter -s /usr/bin/nologin \
+			-c "greetd greeter" _greeter
+	fi
+	install -d -m 0755 -o _greeter -g _greeter /var/lib/_greeter
+	log "Para ativar: ln -s /etc/sv/greetd /var/service/"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	post_install
+}
