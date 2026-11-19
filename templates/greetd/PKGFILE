@@ -9,10 +9,17 @@
 # [initial_session] (autologin) abria a sessão antes do dbus/elogind estarem
 # prontos -> sessão sem seat -> compositor em panic (cosmic-comp saía com
 # 101). O dbus ativa o elogind, então esperar o dbus basta.
+#
+# O pacote NÃO é dono do /etc/greetd/config.toml: quem manda nele são os
+# pacotes de config de cada edição (voidbr-cosmic-config,
+# voidbr-umbriel-config). Se os dois forem donos do mesmo arquivo, o último
+# instalado ganha -- foi assim que uma ISO COSMIC subiu com o agreety em vez
+# do cosmic-greeter. O config padrão fica em /usr/share/greetd/config.toml e
+# só é copiado pro /etc se não existir nenhum.
 
 pkgname=greetd
 pkgver=0.10.3
-pkgrel=3 # Void está em 0.10.3_2
+pkgrel=4 # Void está em 0.10.3_2
 pkgdesc='Minimal and flexible login manager daemon'
 arch=(x86_64)
 url=https://git.sr.ht/~kennylevinsen/greetd
@@ -28,7 +35,6 @@ makedepends=(
 	pkg-config
 	scdoc
 )
-backup=(etc/greetd/config.toml)
 source=("${pkgname}-${pkgver}.tar.gz::https://git.sr.ht/~kennylevinsen/greetd/archive/${pkgver}.tar.gz")
 sha256sums=('ee5cb70e0add4ca9c9fe57e47581ab0002d44c07743fb5492469f3b570db640b')
 
@@ -37,6 +43,13 @@ prepare() {
 	# mesmos patches do Void: VT 7 e usuário do greeter _greeter
 	sed -i 's/^vt = 1$/vt = 7/' config.toml
 	sed -i 's/^user = "greeter"$/user = "_greeter"/' config.toml
+	# VoidBR: não carregar /etc/profile e ~/.profile nos comandos do greetd
+	# (o greeter roda como _greeter, sem sudo; scripts do profile.d travavam)
+	{
+		printf '[general]\nsource_profile = false\n\n'
+		cat config.toml
+	} >config.toml.new
+	mv config.toml.new config.toml
 	cargo fetch --locked
 }
 
@@ -51,7 +64,9 @@ package() {
 	install -Dm755 target/release/agreety "${pkgdir}"/usr/bin/agreety
 	install -Dm755 target/release/fakegreet "${pkgdir}"/usr/bin/fakegreet
 	install -Dm755 target/release/greetd "${pkgdir}"/usr/bin/greetd
-	install -Dm644 config.toml "${pkgdir}"/etc/greetd/config.toml
+	# config padrão fora do /etc (ver cabeçalho); o post_install copia se faltar
+	install -Dm644 config.toml "${pkgdir}"/usr/share/greetd/config.toml
+	install -dm755 "${pkgdir}"/etc/greetd
 
 	make -C man install PREFIX=/usr DESTDIR="${pkgdir}"
 
@@ -101,6 +116,11 @@ post_install() {
 			-c "greetd greeter" _greeter
 	fi
 	install -d -m 0755 -o _greeter -g _greeter /var/lib/_greeter
+	# config padrão só se nenhum pacote de edição tiver instalado um
+	if [ ! -e /etc/greetd/config.toml ]; then
+		install -Dm644 /usr/share/greetd/config.toml /etc/greetd/config.toml
+		log "greetd: /etc/greetd/config.toml padrão criado (agreety)"
+	fi
 	log "Para ativar: ln -s /etc/sv/greetd /var/service/"
 }
 
